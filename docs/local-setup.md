@@ -18,21 +18,28 @@ cd <your-repo>
 
 GitHub login uses your GitHub account (easier than `origin.cursor.com`).
 
-### Option B — Cursor Origin
+### Option B — Cursor Origin via WSL (recommended on Windows)
 
-```powershell
-git clone https://origin.cursor.com/git/admin-ultron/tmp-3354235fd9a79908.git
-cd tmp-3354235fd9a79908
+Origin CLI is **not available in PowerShell**. Use WSL:
+
+```bash
+# Run in WSL (Origin CLI is not available in PowerShell)
+curl -fsSL https://downloads.cursor.com/origin/install.sh | sh
+origin auth login
+origin repo clone admin-ultron/ultron-adb-qa-site
 ```
 
-When **Git Credential Manager** appears:
+If `origin` is not found:
 
-- **Username**: your GitHub username (often `admin-ultron`) or Cursor account email
-- **Password**: a **Personal Access Token** (not your login password)
-  - GitHub: Settings → Developer settings → Personal access tokens
-  - Or use the token from Cursor after **Create repo**
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
 
-If stuck, use **Option A** instead.
+Full guide: [route-b-wsl-setup.md](./route-b-wsl-setup.md)
+
+- Browse: https://cursor.com/codebase/admin-ultron/ultron-adb-qa-site
+- Origin CLI docs: https://cursor.com/docs/origin/cli
 
 ### Option C — One-click scripts (after clone)
 
