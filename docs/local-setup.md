@@ -4,24 +4,51 @@ Move development and ADB testing from Cursor Cloud to your office machine.
 
 ## 1. Get the code
 
-### Option A — GitHub (recommended)
+### Option A — GitHub (recommended for Windows)
 
-1. In Cursor Project, click **Create repo** if not done yet.
-2. After the repo is linked to GitHub, clone on your machine:
+1. In Cursor Project chat, click **Create repo** (top of Project).
+2. Wait until GitHub repo is created.
+3. On Windows PowerShell:
 
-```bash
+```powershell
+cd C:\Users\User
 git clone https://github.com/<your-org>/<your-repo>.git
 cd <your-repo>
 ```
 
-### Option B — Cursor Origin (current remote)
+GitHub login uses your GitHub account (easier than `origin.cursor.com`).
 
-```bash
+### Option B — Cursor Origin
+
+```powershell
 git clone https://origin.cursor.com/git/admin-ultron/tmp-3354235fd9a79908.git
 cd tmp-3354235fd9a79908
 ```
 
-You may need Cursor authentication for this URL.
+When **Git Credential Manager** appears:
+
+- **Username**: your GitHub username (often `admin-ultron`) or Cursor account email
+- **Password**: a **Personal Access Token** (not your login password)
+  - GitHub: Settings → Developer settings → Personal access tokens
+  - Or use the token from Cursor after **Create repo**
+
+If stuck, use **Option A** instead.
+
+### Option C — One-click scripts (after clone)
+
+From repo root in PowerShell:
+
+```powershell
+.\scripts\windows-start.ps1
+```
+
+Opens Chrome to http://127.0.0.1:43123 and starts the frontend dev server.
+
+For the agent (second window):
+
+```powershell
+.\scripts\windows-start-agent.ps1
+```
 
 ## 2. Install prerequisites
 
