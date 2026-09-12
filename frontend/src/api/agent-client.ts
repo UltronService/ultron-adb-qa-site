@@ -1,4 +1,4 @@
-const DEFAULT_AGENT_URL = 'http://127.0.0.1:8000';
+const DEFAULT_AGENT_URL = import.meta.env.DEV ? '/agent-api' : 'http://127.0.0.1:8765';
 
 export function getAgentBaseUrl(): string {
   const configured = import.meta.env.VITE_AGENT_URL;
@@ -6,6 +6,15 @@ export function getAgentBaseUrl(): string {
     return configured.replace(/\/$/, '');
   }
   return DEFAULT_AGENT_URL;
+}
+
+export function getAgentWebSocketBase(): string {
+  const baseUrl = getAgentBaseUrl();
+  if (baseUrl.startsWith('/')) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}${baseUrl}`;
+  }
+  return baseUrl.replace(/^http/, 'ws');
 }
 
 interface RequestOptions extends RequestInit {

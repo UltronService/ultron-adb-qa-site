@@ -1,4 +1,4 @@
-import { agentRequest } from './agent-client';
+import { agentRequest, getAgentWebSocketBase } from './agent-client';
 
 interface ScreenshotResponse {
   image_base64: string;
@@ -26,7 +26,6 @@ export async function sendTextInput(deviceId: string, text: string): Promise<voi
 }
 
 export function openLogcatStream(deviceId: string): WebSocket {
-  const baseUrl = import.meta.env.VITE_AGENT_URL ?? 'http://127.0.0.1:8000';
-  const wsBase = baseUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+  const wsBase = getAgentWebSocketBase();
   return new WebSocket(`${wsBase}/api/console/${deviceId}/logcat`);
 }
