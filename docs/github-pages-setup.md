@@ -8,11 +8,25 @@ https://ultronservice.github.io/ultron-adb-qa-site/
 
 Repository: https://github.com/UltronService/ultron-adb-qa-site
 
+## Prerequisites
+
+**Private repos cannot use GitHub Pages on the free plan.** Choose one:
+
+| Option | Cost | Notes |
+|--------|------|-------|
+| **A. Make repo Public** (recommended) | Free | Fine for UI mock; no secrets in repo |
+| B. Upgrade GitHub | Paid | Keeps repo private |
+| C. Cloudflare Pages / Vercel | Free | Works with private repo; different URL |
+
+This guide assumes **Option A**.
+
 ## One-time GitHub settings
 
-1. Open https://github.com/UltronService/ultron-adb-qa-site/settings/pages
-2. Under **Build and deployment** → **Source**, select **GitHub Actions**
-3. Save if prompted
+1. Open https://github.com/UltronService/ultron-adb-qa-site/settings
+2. Scroll to **Danger Zone** → **Change repository visibility** → **Public**
+3. Open https://github.com/UltronService/ultron-adb-qa-site/settings/pages
+4. Under **Build and deployment** → **Source**, select **GitHub Actions**
+5. Save if prompted
 
 ## Deploy workflow
 
