@@ -52,22 +52,60 @@ sudo apt install -y nodejs npm python3 python3-venv android-tools-adb
 
 ## 3. Run frontend
 
+Run these from the **repository root** (the folder that contains `frontend/`).
+
+### macOS / Linux (bash)
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
 
+### Windows PowerShell 5.x
+
+PowerShell 5 does **not** support `&&`. Use semicolons or run one command per line:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Or in one line:
+
+```powershell
+cd frontend; npm install; npm run dev
+```
+
 Open: http://127.0.0.1:43123
 
 ## 4. Run agent (ADB host)
 
+### macOS / Linux (bash)
+
 ```bash
 cd agent
 python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8765
+```
+
+### Windows PowerShell 5.x
+
+```powershell
+cd agent
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8765
+```
+
+If script execution is blocked, run once as Administrator:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 Health check: http://127.0.0.1:8765/health

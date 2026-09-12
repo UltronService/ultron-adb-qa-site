@@ -19,7 +19,19 @@ Internal web console for testing APK builds on multiple Android set-top boxes vi
 
 ## Run Frontend (development)
 
+From the repository root:
+
+**bash (macOS/Linux):**
+
 ```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**Windows PowerShell 5.x** (does not support `&&`):
+
+```powershell
 cd frontend
 npm install
 npm run dev
@@ -38,10 +50,22 @@ For GitHub Pages, set `VITE_BASE_PATH` to your repository path before building.
 
 ## Run Agent (development)
 
+**bash (macOS/Linux):**
+
 ```bash
 cd agent
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8765
+```
+
+**Windows PowerShell:**
+
+```powershell
+cd agent
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8765
 ```
