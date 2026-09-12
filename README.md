@@ -72,10 +72,16 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8765
 
 Health check: `http://127.0.0.1:8765/health`
 
+## GitHub Pages
+
+- **Repository**: https://github.com/UltronService/ultron-adb-qa-site
+- **Live URL** (after first deploy): https://ultronservice.github.io/ultron-adb-qa-site/
+- **Setup**: see [docs/github-pages-setup.md](./docs/github-pages-setup.md)
+
+Push to `main` triggers GitHub Actions deploy.
+
 ## Deployment Notes
 
-- Frontend: GitHub Pages
+- Frontend: GitHub Pages (UI only)
 - Agent: office test host with ADB access to STBs
 - Tunnel: Cloudflare Tunnel (or similar) to connect HTTPS frontend to the agent
-
-Office host deployment steps will be documented in a later phase.

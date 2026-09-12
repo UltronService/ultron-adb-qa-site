@@ -6,9 +6,11 @@ import { ConsolePage } from './pages/console-page';
 import { DevicesPage } from './pages/devices-page';
 import { ReportsPage } from './pages/reports-page';
 
+const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, '');
+
 export function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={routerBasename}>
       <Routes>
         <Route element={<AppLayout />} path="/">
           <Route element={<Navigate replace to="/devices" />} index />
