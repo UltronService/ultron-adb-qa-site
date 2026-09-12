@@ -1,59 +1,62 @@
-import { useState } from 'react';
-import { MOCK_DEVICES } from '../data/mock-devices';
-
-interface MockApk {
-  id: string;
-  appName: string;
-  packageName: string;
-  versionName: string;
-  versionCode: number;
-  sizeMb: number;
-  uploadedAt: string;
-  notes: string;
-}
-
-const MOCK_APKS: MockApk[] = [
-  {
-    id: 'apk-1',
-    appName: 'TV App',
-    packageName: 'com.example.tvapp',
-    versionName: '2.1.0',
-    versionCode: 210,
-    sizeMb: 48.2,
-    uploadedAt: '2026-09-10 14:22',
-    notes: 'Player hotfix build',
-  },
-  {
-    id: 'apk-2',
-    appName: 'TV App',
-    packageName: 'com.example.tvapp',
-    versionName: '2.0.3',
-    versionCode: 203,
-    sizeMb: 47.8,
-    uploadedAt: '2026-09-05 09:10',
-    notes: 'Regression baseline',
-  },
-  {
-    id: 'apk-3',
-    appName: 'TV App Beta',
-    packageName: 'com.example.tvapp.beta',
-    versionName: '2.2.0-beta1',
-    versionCode: 220,
-    sizeMb: 49.1,
-    uploadedAt: '2026-09-11 18:40',
-    notes: 'New login flow test',
-  },
-];
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchApks, installApk, uploadApk } from '../api/apk-api';
+import { fetchDevices } from '../api/device-api';
+import type { ApkInfo, DeviceInfo } from '../types/api-types';
 
 export function ApkPage() {
-  const [selectedApkId, setSelectedApkId] = useState(MOCK_APKS[0]?.id ?? '');
-  const [targetDeviceIds, setTargetDeviceIds] = useState<string[]>(['stb-1', 'stb-2']);
-  const [allowOverlay, setAllowOverlay] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [apks, setApks] = useState<ApkInfo[]>([]);
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [selectedApkId, setSelectedApkId] = useState('');
+  const [targetDeviceIds, setTargetDeviceIds] = useState<string[]>([]);
+  const [installResults, setInstallResults] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
+
+  const loadData = useCallback(async () => {
+    try {
+      const [apkList, deviceList] = await Promise.all([fetchApks(), fetchDevices()]);
+      setApks(apkList);
+      setDevices(deviceList.filter((device) => device.online));
+      if (!selectedApkId && apkList[0]) {
+        setSelectedApkId(apkList[0].id);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Failed to load APK data');
+    }
+  }, [selectedApkId]);
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const toggleTarget = (deviceId: string) => {
     setTargetDeviceIds((prev) =>
       prev.includes(deviceId) ? prev.filter((id) => id !== deviceId) : [...prev, deviceId],
     );
+  };
+
+  const handleUpload = async (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+    try {
+      await uploadApk(file, '');
+      await loadData();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Upload failed');
+    }
+  };
+
+  const handleInstall = async () => {
+    if (!selectedApkId || targetDeviceIds.length === 0) {
+      return;
+    }
+    try {
+      const results = await installApk(selectedApkId, targetDeviceIds);
+      setInstallResults(results);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Install failed');
+    }
   };
 
   return (
@@ -65,9 +68,24 @@ export function ApkPage() {
         </div>
       </header>
 
+      {error && <p className="page-footer">{error}</p>}
+
       <div className="upload-zone">
         <p>Drop .apk here or click to upload</p>
-        <button type="button" className="btn btn--primary">Choose file</button>
+        <input
+          ref={fileInputRef}
+          accept=".apk"
+          hidden
+          type="file"
+          onChange={(event) => void handleUpload(event.target.files?.[0])}
+        />
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          Choose file
+        </button>
       </div>
 
       <div className="table-wrap">
@@ -85,7 +103,7 @@ export function ApkPage() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_APKS.map((apk) => (
+            {apks.map((apk) => (
               <tr key={apk.id}>
                 <td>
                   <input
@@ -95,15 +113,13 @@ export function ApkPage() {
                     onChange={() => setSelectedApkId(apk.id)}
                   />
                 </td>
-                <td>{apk.appName}</td>
-                <td><code>{apk.packageName}</code></td>
-                <td>{apk.versionName}</td>
-                <td>{apk.versionCode}</td>
-                <td>{apk.sizeMb} MB</td>
-                <td>{apk.uploadedAt}</td>
-                <td>
-                  <input className="input input--compact" defaultValue={apk.notes} />
-                </td>
+                <td>{apk.app_name}</td>
+                <td><code>{apk.package_name}</code></td>
+                <td>{apk.version_name}</td>
+                <td>{apk.version_code}</td>
+                <td>{apk.size_mb} MB</td>
+                <td>{apk.uploaded_at}</td>
+                <td>{apk.notes}</td>
               </tr>
             ))}
           </tbody>
@@ -113,7 +129,7 @@ export function ApkPage() {
       <section className="panel install-panel">
         <h2>Install to devices</h2>
         <div className="device-checklist">
-          {MOCK_DEVICES.filter((d) => d.online).map((device) => (
+          {devices.map((device) => (
             <label key={device.id} className="checkbox-row">
               <input
                 checked={targetDeviceIds.includes(device.id)}
@@ -124,24 +140,18 @@ export function ApkPage() {
             </label>
           ))}
         </div>
-        <label className="checkbox-row">
-          <input
-            checked={allowOverlay}
-            type="checkbox"
-            onChange={(event) => setAllowOverlay(event.target.checked)}
-          />
-          Allow overlay install (replace existing)
-        </label>
         <div className="toolbar">
-          <button type="button" className="btn btn--primary">Install to selected</button>
-          <button type="button" className="btn btn--danger">Uninstall from selected</button>
+          <button type="button" className="btn btn--primary" onClick={() => void handleInstall()}>
+            Install to selected
+          </button>
         </div>
         <div className="progress-list">
-          <div className="progress-item">
-            <span>STB-LivingRoom</span>
-            <div className="progress-bar"><div className="progress-bar__fill" style={{ width: '70%' }} /></div>
-            <span>Installing… 70%</span>
-          </div>
+          {Object.entries(installResults).map(([deviceId, status]) => (
+            <div key={deviceId} className="progress-item">
+              <span>{deviceId}</span>
+              <span>{status}</span>
+            </div>
+          ))}
         </div>
       </section>
     </section>
