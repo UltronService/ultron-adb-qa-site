@@ -53,7 +53,10 @@ git push github main
 
 Local dev uses base `/`. Pages build uses base `/ultron-adb-qa-site/`.
 
-## Agent API (future)
+## Agent API + Cloudflare Tunnel
 
-GitHub Pages hosts UI only. ADB operations require the office Agent + Cloudflare Tunnel.
-Set `VITE_AGENT_URL` in the workflow when the tunnel URL is ready.
+GitHub Pages 只放 UI。ADB 操作需辦公室 Agent + Cloudflare Tunnel。
+
+1. 依 [Cloudflare Tunnel 設定指南](./cloudflare-tunnel-setup.md) 啟動 tunnel
+2. 在 GitHub repo **Settings → Secrets → Actions** 新增 `VITE_AGENT_URL`（tunnel 的 https URL）
+3. 重新 Run **Deploy GitHub Pages** workflow

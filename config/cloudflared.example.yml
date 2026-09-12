@@ -1,0 +1,10 @@
+# Copy to ~/.cloudflared/config.yml after creating a named tunnel.
+# Replace TUNNEL_ID and hostname with your values.
+
+tunnel: TUNNEL_ID
+credentials-file: C:\Users\User\.cloudflared\TUNNEL_ID.json
+
+ingress:
+  - hostname: ultron-qa-agent.yourdomain.com
+    service: http://127.0.0.1:8765
+  - service: http_status:404

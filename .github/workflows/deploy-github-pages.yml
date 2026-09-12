@@ -32,6 +32,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_BASE_PATH: /ultron-adb-qa-site/
+          VITE_AGENT_URL: ${{ secrets.VITE_AGENT_URL }}
         run: |
           npm ci
           npm run build
