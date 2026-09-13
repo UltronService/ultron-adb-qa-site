@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from models.automation import RunDetail, RunSummary
 from services.run_storage_service import export_html, get_run, get_run_dir, list_runs
@@ -22,11 +22,11 @@ async def get_run_detail(run_id: str) -> RunDetail:
     return detail
 
 
-@router.get("/{run_id}/export")
+@router.get("/{run_id}/export", response_model=None)
 async def export_run(
     run_id: str,
     format: str = Query(default="html", alias="format"),
-) -> HTMLResponse | JSONResponse:
+) -> Response:
     if format == "pdf":
         return JSONResponse(status_code=501, content={"detail": "PDF export not implemented"})
 
