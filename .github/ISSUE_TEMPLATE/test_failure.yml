@@ -1,0 +1,63 @@
+name: Test Failure (Automation)
+description: Report a failed Ultron automation run
+title: "[Test Failure] "
+labels:
+  - test-failure
+  - automation
+body:
+  - type: input
+    id: run_id
+    attributes:
+      label: Run ID
+      description: From Automation page or Reports (e.g. 20260913T160000Z_cold-start)
+      placeholder: 20260913T160000Z_cold-start
+    validations:
+      required: true
+
+  - type: dropdown
+    id: template_id
+    attributes:
+      label: Template ID
+      description: Automation template that failed
+      options:
+        - cold-start
+        - monkey
+        - long-play
+        - reboot-net
+    validations:
+      required: true
+
+  - type: input
+    id: device_id
+    attributes:
+      label: Device ID
+      description: ADB serial of the failing STB
+      placeholder: 192.168.1.176:5555
+    validations:
+      required: true
+
+  - type: input
+    id: failed_step
+    attributes:
+      label: 失敗步驟
+      description: Step name from automation progress
+      placeholder: launch-app
+    validations:
+      required: false
+
+  - type: textarea
+    id: error_message
+    attributes:
+      label: 錯誤訊息
+      description: Error output or log excerpt
+    validations:
+      required: false
+
+  - type: input
+    id: test_case_id
+    attributes:
+      label: 相關測試案例 ID
+      description: From docs/test-cases/
+      placeholder: TC-BOOT-001
+    validations:
+      required: false

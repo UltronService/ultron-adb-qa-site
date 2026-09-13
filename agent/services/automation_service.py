@@ -1,12 +1,44 @@
 import asyncio
-import uuid
+import os
+import re
+import shutil
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Final
 
+from models.automation import (
+    AutomationParams,
+    DeviceStatus,
+    RunStep,
+    StepStatus,
+    StoredDeviceResult,
+    TemplateId,
+)
 from models.schemas import (
     AutomationProgressRow,
     AutomationRunStatus,
     AutomationTemplate,
 )
+from services.adb_errors import AdbCommandError, AdbNotFoundError
+from services.adb_service import AdbService
+from services.run_storage_service import (
+    TEMPLATE_NAMES,
+    create_run_dir,
+    sanitize_serial,
+    save_meta,
+)
+
+_SCRIPTS_DIR: Final[Path] = Path(__file__).resolve().parent.parent / "scripts"
+
+_TEMPLATE_SCRIPT: Final[dict[TemplateId, str]] = {
+    TemplateId.COLD_START: "cold-start.sh",
+    TemplateId.MONKEY: "monkey-stress.sh",
+    TemplateId.LONG_PLAY: "long-playback.sh",
+    TemplateId.REBOOT_NET: "reboot-net.sh",
+}
+
+_LAUNCH_TIME_PATTERN: Final[re.Pattern[str]] = re.compile(r"launch_time_ms=(\d+)")
 
 
 @dataclass
@@ -45,9 +77,26 @@ class AutomationService:
 
     def __init__(self) -> None:
         self._jobs: dict[str, AutomationJob] = {}
+        self._adb = AdbService()
 
     def list_templates(self) -> list[AutomationTemplate]:
         return list(self.TEMPLATES)
+
+    def _ensure_adb(self) -> None:
+        if shutil.which("adb") is None:
+            raise AdbNotFoundError("adb not found in PATH. Install Android Platform Tools.")
+
+    def _parse_params(self, template_id: str, params: dict[str, str]) -> AutomationParams:
+        template_enum = TemplateId(template_id)
+        automation_params = AutomationParams(
+            package_name=params.get("package_name") or None,
+            monkey_events=int(params.get("monkey_events", "500")),
+            duration_minutes=int(params.get("duration_minutes", "30")),
+            launch_time_max_ms=int(params.get("launch_time_max_ms", "3000")),
+        )
+        if template_enum != TemplateId.REBOOT_NET and not automation_params.package_name:
+            raise ValueError("params.package_name is required for this template.")
+        return automation_params
 
     async def start_run(
         self,
@@ -62,7 +111,11 @@ class AutomationService:
         if template is None:
             raise ValueError("Unknown template")
 
-        run_id = str(uuid.uuid4())
+        automation_params = self._parse_params(template_id, params)
+        self._ensure_adb()
+
+        template_enum = TemplateId(template_id)
+        run_id = self._generate_run_id(template_enum)
         job = AutomationJob(
             run_id=run_id,
             template_id=template_id,
@@ -78,7 +131,7 @@ class AutomationService:
             ],
         )
         self._jobs[run_id] = job
-        asyncio.create_task(self._simulate_run(job))
+        asyncio.create_task(self._execute_run(job, template_enum, automation_params))
         return self.get_status(run_id)
 
     def get_status(self, run_id: str) -> AutomationRunStatus:
@@ -93,14 +146,197 @@ class AutomationService:
             progress=list(job.progress),
         )
 
-    async def _simulate_run(self, job: AutomationJob) -> None:
-        steps = ["Launch app", "Execute template", "Collect metrics"]
-        for step in steps:
-            await asyncio.sleep(1)
+    def _generate_run_id(self, template_id: TemplateId) -> str:
+        timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        return f"{timestamp}_{template_id.value}"
+
+    async def _resolve_device_label(self, device_id: str) -> str:
+        try:
+            devices = await self._adb.list_devices()
+        except (AdbCommandError, AdbNotFoundError, OSError):
+            return device_id
+
+        for device in devices:
+            if device.id == device_id:
+                return device.label
+        return device_id
+
+    async def _capture_screenshot(self, device_id: str, screenshot_path: Path) -> None:
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "adb",
+                "-s",
+                device_id,
+                "exec-out",
+                "screencap",
+                "-p",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout_bytes, _ = await process.communicate()
+            if process.returncode == 0 and stdout_bytes:
+                screenshot_path.write_bytes(stdout_bytes)
+        except OSError:
+            return
+
+    def _parse_steps_from_log(self, template_id: TemplateId, log_content: str, passed: bool) -> list[RunStep]:
+        if template_id == TemplateId.COLD_START:
+            match = _LAUNCH_TIME_PATTERN.search(log_content)
+            detail = f"launch_time_ms={match.group(1)}" if match else None
+            return [
+                RunStep(name="force-stop", status=StepStatus.PASS if passed else StepStatus.FAIL),
+                RunStep(
+                    name="launch-app",
+                    status=StepStatus.PASS if passed else StepStatus.FAIL,
+                    detail=detail,
+                ),
+            ]
+
+        if template_id == TemplateId.MONKEY:
+            return [
+                RunStep(name="clear-logcat", status=StepStatus.PASS if passed else StepStatus.FAIL),
+                RunStep(name="monkey-stress", status=StepStatus.PASS if passed else StepStatus.FAIL),
+                RunStep(name="check-fatal", status=StepStatus.PASS if passed else StepStatus.FAIL),
+            ]
+
+        if template_id == TemplateId.LONG_PLAY:
+            return [
+                RunStep(name="launch-app", status=StepStatus.PASS if passed else StepStatus.FAIL),
+                RunStep(name="monitor-stability", status=StepStatus.PASS if passed else StepStatus.FAIL),
+            ]
+
+        return [
+            RunStep(name="reboot", status=StepStatus.PASS if passed else StepStatus.FAIL),
+            RunStep(name="wait-boot", status=StepStatus.PASS if passed else StepStatus.FAIL),
+            RunStep(name="ping-network", status=StepStatus.PASS if passed else StepStatus.FAIL),
+        ]
+
+    def _latest_step_label(self, steps: list[RunStep], error: str | None) -> str:
+        if not steps:
+            return error or "Completed"
+        last_step = steps[-1]
+        if last_step.detail:
+            return f"{last_step.name} ({last_step.detail})"
+        return last_step.name
+
+    async def _run_script_for_device(
+        self,
+        run_dir: Path,
+        template_id: TemplateId,
+        device_id: str,
+        params: AutomationParams,
+        progress_row: AutomationProgressRow,
+    ) -> StoredDeviceResult:
+        script_name = _TEMPLATE_SCRIPT[template_id]
+        script_path = _SCRIPTS_DIR / script_name
+        sanitized = sanitize_serial(device_id)
+        log_path = run_dir / "logs" / f"{sanitized}.txt"
+        screenshot_path = run_dir / "screenshots" / f"{sanitized}.png"
+        device_label = await self._resolve_device_label(device_id)
+        progress_row.device_label = device_label
+        progress_row.step = "Running script"
+
+        env = os.environ.copy()
+        env["ADB_SERIAL"] = device_id
+        env["PACKAGE_NAME"] = params.package_name or ""
+        env["MONKEY_EVENTS"] = str(params.monkey_events)
+        env["DURATION_MINUTES"] = str(params.duration_minutes)
+        env["LAUNCH_TIME_MAX_MS"] = str(params.launch_time_max_ms)
+        env["RUN_LOG_PATH"] = str(log_path)
+
+        error_message: str | None = None
+        passed = False
+        log_content = ""
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "bash",
+                str(script_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+                cwd=str(_SCRIPTS_DIR),
+            )
+            stdout_bytes, stderr_bytes = await process.communicate()
+            stdout = stdout_bytes.decode(errors="replace")
+            stderr = stderr_bytes.decode(errors="replace")
+
+            if log_path.is_file():
+                log_content = log_path.read_text(encoding="utf-8", errors="replace")
+            else:
+                log_content = f"{stdout}\n{stderr}".strip()
+                log_path.write_text(log_content, encoding="utf-8")
+
+            passed = process.returncode == 0
+            if not passed:
+                error_message = stderr or stdout or f"Script exited with code {process.returncode}"
+        except OSError as error:
+            error_message = str(error)
+            log_path.write_text(error_message, encoding="utf-8")
+            log_content = error_message
+        else:
+            if log_path.is_file():
+                log_content = log_path.read_text(encoding="utf-8", errors="replace")
+
+        await self._capture_screenshot(device_id, screenshot_path)
+        screenshot_rel = f"screenshots/{sanitized}.png" if screenshot_path.is_file() else None
+
+        steps = self._parse_steps_from_log(template_id, log_content, passed)
+        status = DeviceStatus.PASS if passed else DeviceStatus.FAIL
+        progress_row.step = self._latest_step_label(steps, error_message)
+        progress_row.status = "Pass" if passed else "Fail"
+
+        return StoredDeviceResult(
+            device_id=device_id,
+            device_label=device_label,
+            status=status.value,
+            steps=steps,
+            log_path=f"logs/{sanitized}.txt",
+            screenshot_path=screenshot_rel,
+            error=error_message,
+        )
+
+    async def _execute_run(
+        self,
+        job: AutomationJob,
+        template_id: TemplateId,
+        params: AutomationParams,
+    ) -> None:
+        started_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        run_dir = create_run_dir(job.run_id)
+        stored_results: list[StoredDeviceResult] = []
+
+        try:
+            for device_id, progress_row in zip(job.device_ids, job.progress, strict=True):
+                result = await self._run_script_for_device(
+                    run_dir,
+                    template_id,
+                    device_id,
+                    params,
+                    progress_row,
+                )
+                stored_results.append(result)
+        except Exception as error:
             for row in job.progress:
                 if row.status == "Running":
-                    row.step = step
-            if step == "Collect metrics":
-                for index, row in enumerate(job.progress):
-                    row.status = "Pass" if index % 2 == 0 else "Fail"
+                    row.step = str(error)
+                    row.status = "Fail"
+            job.state = "completed"
+            return
+
+        pass_count = sum(1 for result in stored_results if result.status == DeviceStatus.PASS.value)
+        fail_count = len(stored_results) - pass_count
+        finished_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+        meta = {
+            "id": job.run_id,
+            "template_id": template_id.value,
+            "template_name": TEMPLATE_NAMES[template_id.value],
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "params": params.model_dump(exclude_none=True),
+            "summary": {"pass": pass_count, "fail": fail_count},
+            "devices": [result.model_dump(mode="json") for result in stored_results],
+        }
+        save_meta(run_dir, meta)
         job.state = "completed"

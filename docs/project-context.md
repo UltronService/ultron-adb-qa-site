@@ -40,8 +40,12 @@ Ultron ADB QA Site is an internal web console for QA engineers to test APK build
 
 ### Phase 3
 
-- Automation templates and progress board
-- Screenshot diff and report export
+- Automation templates and progress board — **implemented**: `POST /automation/run`, 4 shell scripts, Automation page wired to Agent
+- Run history persistence — **implemented**: `agent/data/runs/`, `GET /runs`, Reports page wired to Agent
+- HTML report export — **implemented**: `GET /runs/{id}/export?format=html`
+- Test case docs — **implemented**: `docs/test-cases/` (TC-BOOT/STRESS/PLAY/NET)
+- GitHub Issues templates — **implemented**: bug_report, test_failure
+- Screenshot diff algorithm — not yet implemented (UI mock remains)
 
 ### Phase 4
 

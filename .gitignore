@@ -8,3 +8,5 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 agent/storage/
+agent/data/runs/**
+!agent/data/runs/.gitkeep

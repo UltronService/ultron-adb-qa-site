@@ -1,43 +1,44 @@
+from datetime import datetime
+
 from models.schemas import ReportDiff, ReportSummary
+from services.run_storage_service import get_run, list_runs
 
 
 class ReportsService:
-    def __init__(self) -> None:
-        self._reports: list[ReportSummary] = [
-            ReportSummary(
-                id="run-1",
-                date="2026-09-11 16:00",
-                template="Cold start time",
-                pass_count=2,
-                fail_count=1,
-            ),
-            ReportSummary(
-                id="run-2",
-                date="2026-09-10 11:20",
-                template="Monkey stress",
-                pass_count=3,
-                fail_count=0,
-            ),
-            ReportSummary(
-                id="run-3",
-                date="2026-09-09 09:45",
-                template="Long playback",
-                pass_count=1,
-                fail_count=2,
-            ),
-        ]
+    def _format_date(self, iso_date: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(iso_date.replace("Z", "+00:00"))
+            return parsed.strftime("%Y-%m-%d %H:%M")
+        except ValueError:
+            return iso_date
 
     def list_reports(self) -> list[ReportSummary]:
-        return list(self._reports)
+        runs = list_runs()
+        if not runs:
+            return []
+
+        return [
+            ReportSummary(
+                id=run.id,
+                date=self._format_date(run.started_at),
+                template=run.template_name,
+                pass_count=run.pass_count,
+                fail_count=run.fail,
+            )
+            for run in runs
+        ]
 
     def get_report(self, report_id: str) -> ReportSummary:
-        for report in self._reports:
+        for report in self.list_reports():
             if report.id == report_id:
                 return report
         raise KeyError("Report not found")
 
     def get_diff(self, report_id: str) -> ReportDiff:
-        self.get_report(report_id)
+        detail = get_run(report_id)
+        if detail is None:
+            self.get_report(report_id)
+
         return ReportDiff(
             report_id=report_id,
             baseline_label="Baseline screenshot",

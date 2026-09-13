@@ -144,6 +144,39 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 Health check: http://127.0.0.1:8765/health
 
+<<<<<<< HEAD
+=======
+Device API (local agent):
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/devices` | List connected STBs with model, Android version, CPU/RAM/Ping |
+| POST | `/devices/connect` | Connect by IP, e.g. `{"address":"192.168.1.101:5555"}` |
+| POST | `/devices/scan` | Scan LAN subnet for ADB port 5555 |
+
+Automation & Reports API:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/automation/run` | Run automation template on selected STBs |
+| GET | `/runs` | List persisted test run history |
+| GET | `/runs/{id}` | Get run detail (steps, logs, screenshots) |
+| GET | `/runs/{id}/export?format=html` | Download HTML report |
+
+Example automation run:
+
+```bash
+curl -X POST http://127.0.0.1:8765/automation/run \
+  -H 'Content-Type: application/json' \
+  -d '{"template_id":"cold-start","device_ids":["192.168.1.176:5555"],"params":{"package_name":"com.example.tvapp"}}'
+
+curl http://127.0.0.1:8765/runs
+curl "http://127.0.0.1:8765/runs/{run_id}/export?format=html" -o report.html
+```
+
+Frontend dev server proxies `/agent-api/*` to `http://127.0.0.1:8765`. For GitHub Pages, set `VITE_AGENT_API_URL` to your Cloudflare Tunnel URL at build time.
+
+>>>>>>> 7dfb59d (feat: add test management, automation engine, and run persistence)
 ## 5. Connect a set-top box (when ready)
 
 Enable ADB over network on the STB (port 5555), then:
