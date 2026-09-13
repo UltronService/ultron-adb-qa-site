@@ -1,19 +1,21 @@
 import { NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
-  { path: '/devices', label: 'Devices' },
+  { path: '/', label: '總覽' },
+  { path: '/devices', label: '裝置' },
   { path: '/console', label: 'Console' },
   { path: '/apk', label: 'APK' },
-  { path: '/automation', label: 'Automation' },
+  { path: '/automation', label: '自動化' },
   { path: '/scripts', label: '劇本' },
-  { path: '/reports', label: 'Reports' },
+  { path: '/reports', label: '報表' },
 ] as const;
 
 export function NavBar() {
   return (
     <nav className="nav-bar" aria-label="Main navigation">
-      <NavLink className="nav-bar__brand" to="/devices">
-        Ultron ADB QA Site
+      <NavLink className="nav-bar__brand" to="/">
+        <span className="nav-bar__brand-title">Ultron ADB QA</span>
+        <span className="nav-bar__brand-sub">QA Console</span>
       </NavLink>
       <ul className="nav-bar__list">
         {NAV_ITEMS.map((item) => (
@@ -22,6 +24,7 @@ export function NavBar() {
               className={({ isActive }) =>
                 isActive ? 'nav-bar__link nav-bar__link--active' : 'nav-bar__link'
               }
+              end={item.path === '/'}
               to={item.path}
             >
               {item.label}

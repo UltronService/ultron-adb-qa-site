@@ -14,24 +14,24 @@ export const MOCK_REPORT_DETAILS: Record<string, MockReportDetail> = {
   'run-1': {
     ...MOCK_REPORTS[0],
     devices: [
-      { label: 'STB-LivingRoom', status: 'Pass', note: 'Cold start 2.1s' },
-      { label: 'STB-QA-Bench', status: 'Pass', note: 'Cold start 2.4s' },
+      { label: 'STB-176', status: 'Pass', note: 'Cold start 2.1s' },
+      { label: 'STB-148', status: 'Pass', note: 'Cold start 2.4s' },
       { label: 'STB-Spare', status: 'Fail', note: 'Offline during run' },
     ],
   },
   'run-2': {
     ...MOCK_REPORTS[1],
     devices: [
-      { label: 'STB-LivingRoom', status: 'Pass', note: '500 events, 0 crash' },
-      { label: 'STB-QA-Bench', status: 'Pass', note: '500 events, 0 crash' },
+      { label: 'STB-176', status: 'Pass', note: '500 events, 0 crash' },
+      { label: 'STB-148', status: 'Pass', note: '500 events, 0 crash' },
       { label: 'STB-Spare', status: 'Pass', note: '500 events, 0 crash' },
     ],
   },
   'run-3': {
     ...MOCK_REPORTS[2],
     devices: [
-      { label: 'STB-LivingRoom', status: 'Fail', note: 'Buffer stall at 18m' },
-      { label: 'STB-QA-Bench', status: 'Pass', note: '30m stable' },
+      { label: 'STB-176', status: 'Fail', note: 'Buffer stall at 18m' },
+      { label: 'STB-148', status: 'Pass', note: '30m stable' },
       { label: 'STB-Spare', status: 'Fail', note: 'Playback freeze' },
     ],
   },
