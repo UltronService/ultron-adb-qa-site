@@ -4,11 +4,10 @@
 
 1. 辦公室 Windows 主機：Agent 運行中（`scripts/windows-start-agent.ps1`）
 2. STB 已連線：`192.168.1.176:5555`、`192.168.1.148:5555`
-3. 已 build APK：
+3. 已取得 APK（推薦 GCS 下載，見 [ultron-apk-source.md](./ultron-apk-source.md)）：
 
 ```bash
-cd UltronProject-copy20260425
-./gradlew assembleDemoRelease
+curl -LO "https://storage.googleapis.com/ultron-local/APKs/UltronProject2022_v1.0.0(10053)_20260907_product_release.apk"
 ```
 
 4. （GitHub Pages 驗收）Tunnel + `VITE_AGENT_URL` 已設定
