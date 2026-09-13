@@ -72,3 +72,50 @@ class ReportDiff(BaseModel):
     baseline_label: str
     candidate_label: str
     diff_score: float
+
+
+class ScriptStep(BaseModel):
+    id: str
+    action: str
+    label: str
+    params: dict[str, str] = Field(default_factory=dict)
+
+
+class TestScript(BaseModel):
+    id: str
+    name: str
+    target_package: str = "com.ultron.player"
+    launch_activity: str = "com.ultron.player/.MainActivity"
+    steps: list[ScriptStep] = Field(default_factory=list)
+    updated_at: str = ""
+
+
+class CreateScriptRequest(BaseModel):
+    name: str = Field(default="新劇本")
+
+
+class UpdateScriptRequest(BaseModel):
+    name: str
+    target_package: str = "com.ultron.player"
+    launch_activity: str = "com.ultron.player/.MainActivity"
+    steps: list[ScriptStep]
+
+
+class RunScriptRequest(BaseModel):
+    device_id: str
+
+
+class ScriptRunStepResult(BaseModel):
+    step_index: int
+    step_label: str
+    status: str
+    message: str = ""
+
+
+class ScriptRunStatus(BaseModel):
+    run_id: str
+    script_id: str
+    device_id: str
+    state: str
+    current_step: int
+    results: list[ScriptRunStepResult]

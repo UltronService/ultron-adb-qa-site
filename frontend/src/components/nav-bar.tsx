@@ -5,6 +5,7 @@ const NAV_ITEMS = [
   { path: '/console', label: 'Console' },
   { path: '/apk', label: 'APK' },
   { path: '/automation', label: 'Automation' },
+  { path: '/scripts', label: '劇本' },
   { path: '/reports', label: 'Reports' },
 ] as const;
 

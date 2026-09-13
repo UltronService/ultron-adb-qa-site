@@ -5,6 +5,7 @@ import { AutomationPage } from './pages/automation-page';
 import { ConsolePage } from './pages/console-page';
 import { DevicesPage } from './pages/devices-page';
 import { ReportsPage } from './pages/reports-page';
+import { ScriptsPage } from './pages/scripts-page';
 
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, '');
 
@@ -18,6 +19,7 @@ export function App() {
           <Route element={<ConsolePage />} path="console" />
           <Route element={<ApkPage />} path="apk" />
           <Route element={<AutomationPage />} path="automation" />
+          <Route element={<ScriptsPage />} path="scripts" />
           <Route element={<ReportsPage />} path="reports" />
         </Route>
       </Routes>

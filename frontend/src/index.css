@@ -145,3 +145,45 @@ a { color: inherit; text-decoration: none; }
 .diff-image--current { z-index: 2; background: #121820; }
 .diff-slider { position: absolute; left: 0; right: 0; bottom: 0.75rem; z-index: 3; width: calc(100% - 2rem); margin: 0 1rem; }
 .diff-overlay-note { color: #a8b3c5; font-size: 0.85rem; }
+
+.scripts-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr 260px;
+  gap: 1rem;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .scripts-layout { grid-template-columns: 1fr; }
+}
+
+.scripts-toolbox__list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.scripts-toolbox__btn { width: 100%; text-align: left; }
+
+.script-step-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.script-step {
+  display: flex; align-items: center; gap: 0.65rem;
+  padding: 0.65rem 0.75rem; border: 1px solid #243041; border-radius: 0.55rem;
+  background: #1a2230; cursor: pointer;
+}
+.script-step--active { border-color: #3d5afe; background: #1e2a45; }
+.script-step__handle {
+  cursor: grab; background: transparent; border: none; color: #a8b3c5; font-size: 1rem; padding: 0;
+}
+.script-step__index {
+  width: 1.5rem; height: 1.5rem; border-radius: 999px; background: #243041;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem;
+}
+.script-step__body { flex: 1; display: flex; flex-direction: column; gap: 0.15rem; }
+.script-step__body span { color: #a8b3c5; font-size: 0.85rem; }
+.script-step__remove { flex-shrink: 0; }
+
+.script-editor { display: flex; flex-direction: column; gap: 0.75rem; }
+.field-group { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; }
+
+.script-run-results { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #243041; }
+.script-run-results ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.script-run-results__item { display: flex; justify-content: space-between; gap: 0.75rem; font-size: 0.9rem; }
+.script-run-results__item--pass { color: #81c784; }
+.script-run-results__item--fail { color: #ef5350; }
+.script-run-results__item--running { color: #64b5f6; }
+.script-run-results__item--pending { color: #a8b3c5; }

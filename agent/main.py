@@ -7,6 +7,7 @@ from routers.console import router as console_router
 from routers.devices import router as devices_router
 from routers.health import router as health_router
 from routers.reports import router as reports_router
+from routers.scripts import router as scripts_router
 
 app = FastAPI(title="Ultron ADB QA Agent", version="0.2.0")
 
@@ -24,3 +25,4 @@ app.include_router(console_router)
 app.include_router(apk_router)
 app.include_router(automation_router)
 app.include_router(reports_router)
+app.include_router(scripts_router)
