@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchApks, installApk, uploadApk } from '../api/apk-api';
 import { fetchDevices } from '../api/device-api';
+import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
 import type { ApkInfo, DeviceInfo } from '../types/api-types';
 
 export function ApkPage() {
@@ -69,6 +70,18 @@ export function ApkPage() {
       </header>
 
       {error && <p className="page-footer">{error}</p>}
+
+      <section className="panel">
+        <h2>Ultron Player build reference</h2>
+        <dl className="meta-list">
+          <div><dt>App</dt><dd>{ULTRON_PLAYER_APK_SOURCE.appName}</dd></div>
+          <div><dt>Package</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.packageName}</code></dd></div>
+          <div><dt>Version code</dt><dd>{ULTRON_PLAYER_APK_SOURCE.versionCode}</dd></div>
+          <div><dt>Build</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.buildCommand}</code></dd></div>
+          <div><dt>Output</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.outputPath}</code></dd></div>
+          <div><dt>Flavor</dt><dd>{ULTRON_PLAYER_APK_SOURCE.recommendedFlavor}</dd></div>
+        </dl>
+      </section>
 
       <div className="upload-zone">
         <p>Drop .apk here or click to upload</p>

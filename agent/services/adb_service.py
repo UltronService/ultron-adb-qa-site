@@ -12,22 +12,22 @@ class AdbService:
     def __init__(self) -> None:
         self._mock_devices: list[DeviceInfo] = [
             DeviceInfo(
-                id="stb-1",
-                label="STB-LivingRoom",
-                ip="192.168.1.101:5555",
+                id="stb-176",
+                label="Hi3751V560",
+                ip="192.168.1.176:5555",
                 online=True,
-                model="X96 Max+",
+                model="Hi3751V560",
                 android_version="11",
                 cpu_percent=23,
                 ram_percent=61,
                 ping_ms=4,
             ),
             DeviceInfo(
-                id="stb-2",
-                label="STB-QA-Bench",
-                ip="192.168.1.102:5555",
+                id="stb-148",
+                label="gk6760v100",
+                ip="192.168.1.148:5555",
                 online=True,
-                model="Tanix TX3",
+                model="gk6760v100",
                 android_version="9",
                 cpu_percent=41,
                 ram_percent=72,
@@ -191,6 +191,22 @@ class AdbService:
         )
         if return_code != 0:
             raise RuntimeError(stderr or "APK install failed")
+
+    async def launch_activity(self, device_id: str, component: str) -> None:
+        if not self.adb_available:
+            return
+
+        return_code, _stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "am",
+            "start",
+            "-n",
+            component,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or "Activity launch failed")
 
     @staticmethod
     def _extract_field(line: str, prefix: str) -> str:

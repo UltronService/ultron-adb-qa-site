@@ -26,6 +26,7 @@ class ApkInfo(BaseModel):
     size_mb: float
     uploaded_at: str
     notes: str = ""
+    launch_activity: str = ""
 
 
 class InstallApkRequest(BaseModel):

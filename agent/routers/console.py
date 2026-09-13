@@ -53,7 +53,7 @@ async def send_text(device_id: str, payload: TextInputRequest) -> dict[str, str]
 async def stream_logcat(websocket: WebSocket, device_id: str) -> None:
     await websocket.accept()
     sample_lines = [
-        f"[Info][{device_id}] App launch: com.example.tvapp/.MainActivity",
+        f"[Info][{device_id}] App launch: com.ultron.player/.MainActivity",
         f"[Debug][{device_id}] Player buffer ready",
         f"[Warn][{device_id}] Network latency spike: 280ms",
     ]

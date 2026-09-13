@@ -19,6 +19,7 @@ export interface ApkInfo {
   size_mb: number;
   uploaded_at: string;
   notes: string;
+  launch_activity?: string;
 }
 
 export interface AutomationTemplate {
