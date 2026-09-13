@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   captureScreenshot,
+  exportLogcat,
   openLogcatStream,
   sendKeyEvent,
   sendTextInput,
 } from '../api/console-api';
+import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
 import { fetchDevices } from '../api/device-api';
 import { MOCK_DEVICES } from '../data/mock-devices';
 import type { DeviceInfo } from '../types/api-types';
@@ -28,7 +30,9 @@ export function ConsolePage() {
   const [textInput, setTextInput] = useState('');
   const [logLevel, setLogLevel] = useState<(typeof LOG_LEVELS)[number]>('Info');
   const [logFilter, setLogFilter] = useState('');
+  const [packageFilter, setPackageFilter] = useState<string>(ULTRON_PLAYER_APK_SOURCE.packageName);
   const [logs, setLogs] = useState<string[]>([]);
+  const [exportStatus, setExportStatus] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const [error, setError] = useState('');
 
@@ -70,7 +74,10 @@ export function ConsolePage() {
 
     let socket: WebSocket | null = null;
     try {
-      socket = openLogcatStream(selectedDevice);
+      socket = openLogcatStream(selectedDevice, {
+        packageName: packageFilter,
+        level: logLevel,
+      });
       socket.onmessage = (event) => {
         setLogs((prev) => [...prev.slice(-199), event.data]);
       };
@@ -84,7 +91,26 @@ export function ConsolePage() {
     return () => {
       socket?.close();
     };
-  }, [selectedDevice]);
+  }, [selectedDevice, packageFilter, logLevel]);
+
+  const handleExportLogs = async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    try {
+      const result = await exportLogcat(selectedDevice, packageFilter, logLevel);
+      const blob = new Blob([result.content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = result.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setExportStatus(`Exported ${result.line_count} lines${result.mock === 'true' ? ' (mock)' : ''}`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : 'Log export failed');
+    }
+  };
 
   const filteredLogs = useMemo(
     () =>
@@ -222,13 +248,23 @@ export function ConsolePage() {
               </select>
               <input
                 className="input input--compact"
+                placeholder="Package"
+                value={packageFilter}
+                onChange={(event) => setPackageFilter(event.target.value)}
+              />
+              <input
+                className="input input--compact"
                 placeholder="Filter keyword"
                 value={logFilter}
                 onChange={(event) => setLogFilter(event.target.value)}
               />
               <button type="button" className="btn btn--ghost" onClick={() => setLogs([])}>Clear</button>
+              <button type="button" className="btn btn--secondary" onClick={() => void handleExportLogs()}>
+                Export .log
+              </button>
             </div>
           </div>
+          {exportStatus && <p className="page-footer">{exportStatus}</p>}
           <pre className="log-view">{filteredLogs.join('\n')}</pre>
         </aside>
       </div>

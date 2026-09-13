@@ -17,7 +17,7 @@ curl -LO "https://storage.googleapis.com/ultron-local/APKs/UltronProject2022_v1.
 | # | 操作 | 預期 |
 |---|------|------|
 | 1 | 開 `/apk` | 看到 **Ultron Player build reference** 面板（package `com.ultron.player`） |
-| 2 | 點 **Choose file** 上傳 demo release `.apk` | 列表顯示 Ultron Player、正確 package、version code 10042（或 aapt 讀到的值） |
+| 2 | 點 **Choose file** 上傳 GCS 下載的 `.apk` | 列表顯示 Ultron Player、package `com.ultron.player`、version code 10053（或 aapt 讀到的值） |
 | 3 | 勾選 `.176` 與 `.148` STB | 兩台出現在 install checklist |
 | 4 | 點 **Install to selected** | 兩台狀態為 `installed and launched` |
 | 5 | 看 STB 螢幕 | Ultron Player 主畫面出現 |

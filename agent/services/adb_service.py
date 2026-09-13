@@ -1,9 +1,18 @@
 import asyncio
 import re
 import shutil
-from typing import Any
+from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 
 from models.schemas import DeviceInfo
+
+LOG_LEVEL_MAP = {
+    "Verbose": "V",
+    "Debug": "D",
+    "Info": "I",
+    "Warn": "W",
+    "Error": "E",
+}
 
 
 class AdbService:
@@ -191,6 +200,121 @@ class AdbService:
         )
         if return_code != 0:
             raise RuntimeError(stderr or "APK install failed")
+
+    async def resolve_package_pid(self, device_id: str, package_name: str) -> str | None:
+        if not self.adb_available or not package_name:
+            return None
+
+        return_code, stdout, _stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "pidof",
+            "-s",
+            package_name,
+        )
+        if return_code != 0:
+            return None
+
+        pid = stdout.strip()
+        return pid if pid else None
+
+    @staticmethod
+    def format_logcat_line(line: str) -> str:
+        for marker, label in (
+            (" E ", "Error"),
+            (" W ", "Warn"),
+            (" I ", "Info"),
+            (" D ", "Debug"),
+            (" V ", "Verbose"),
+        ):
+            if marker in line:
+                return f"[{label}] {line}"
+        return f"[Info] {line}"
+
+    async def stream_logcat(
+        self,
+        device_id: str,
+        package_name: str = "",
+        log_level: str = "Info",
+    ) -> AsyncIterator[str]:
+        if not self.adb_available:
+            mock_lines = [
+                f"[Info] Mock logcat for {device_id} — adb not available on this host",
+                "[Info] App launch: com.ultron.player/.MainActivity",
+                "[Debug] Player buffer ready",
+                "[Warn] Network latency spike: 280ms",
+                "[Error] Sample error line for filter testing",
+            ]
+            index = 0
+            while True:
+                yield mock_lines[index % len(mock_lines)]
+                index += 1
+                await asyncio.sleep(2)
+
+        pid = await self.resolve_package_pid(device_id, package_name) if package_name else None
+        level_flag = LOG_LEVEL_MAP.get(log_level, "I")
+        args: list[str] = ["-s", device_id, "logcat", "-v", "threadtime"]
+        if pid:
+            args.extend(["--pid", pid])
+        else:
+            args.append(f"*:{level_flag}")
+
+        process = await asyncio.create_subprocess_exec(
+            "adb",
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        if process.stdout is None:
+            raise RuntimeError("Failed to start logcat stream")
+
+        try:
+            while True:
+                line_bytes = await process.stdout.readline()
+                if not line_bytes:
+                    break
+                line = line_bytes.decode("utf-8", errors="replace").rstrip()
+                if not line:
+                    continue
+                yield self.format_logcat_line(line)
+        finally:
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+
+    async def dump_logcat(
+        self,
+        device_id: str,
+        package_name: str = "",
+        log_level: str = "Info",
+        max_lines: int = 2000,
+    ) -> list[str]:
+        if not self.adb_available:
+            return [
+                f"[Info] Mock log export for {device_id}",
+                "[Info] com.ultron.player/.MainActivity",
+                "[Warn] adb not available — connect office Agent for real logs",
+            ]
+
+        pid = await self.resolve_package_pid(device_id, package_name) if package_name else None
+        level_flag = LOG_LEVEL_MAP.get(log_level, "I")
+        args: list[str] = ["-s", device_id, "logcat", "-d", "-v", "threadtime"]
+        if pid:
+            args.extend(["--pid", pid])
+        else:
+            args.append(f"*:{level_flag}")
+
+        return_code, stdout, stderr = await self._run_adb(*args)
+        if return_code != 0:
+            raise RuntimeError(stderr or "Logcat dump failed")
+
+        lines = [
+            self.format_logcat_line(line)
+            for line in stdout.splitlines()
+            if line.strip()
+        ]
+        return lines[-max_lines:]
 
     async def launch_activity(self, device_id: str, component: str) -> None:
         if not self.adb_available:

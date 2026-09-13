@@ -25,7 +25,42 @@ export async function sendTextInput(deviceId: string, text: string): Promise<voi
   });
 }
 
-export function openLogcatStream(deviceId: string): WebSocket {
+export interface LogcatStreamOptions {
+  packageName?: string;
+  level?: string;
+}
+
+export function openLogcatStream(deviceId: string, options: LogcatStreamOptions = {}): WebSocket {
   const wsBase = getAgentWebSocketBase();
-  return new WebSocket(`${wsBase}/api/console/${deviceId}/logcat`);
+  const params = new URLSearchParams();
+  if (options.packageName) {
+    params.set('package', options.packageName);
+  }
+  if (options.level) {
+    params.set('level', options.level);
+  }
+  const query = params.toString();
+  const suffix = query ? `?${query}` : '';
+  return new WebSocket(`${wsBase}/api/console/${deviceId}/logcat${suffix}`);
+}
+
+export interface LogcatExportResponse {
+  filename: string;
+  line_count: number;
+  content: string;
+  mock: string;
+}
+
+export async function exportLogcat(
+  deviceId: string,
+  packageName: string,
+  logLevel: string,
+): Promise<LogcatExportResponse> {
+  return agentRequest<LogcatExportResponse>(`/api/console/${deviceId}/logcat/export`, {
+    method: 'POST',
+    body: JSON.stringify({
+      package_name: packageName,
+      log_level: logLevel,
+    }),
+  });
 }
