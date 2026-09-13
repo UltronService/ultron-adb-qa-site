@@ -66,7 +66,7 @@ export function HomePage() {
     <div className="page home-page">
       <header className="page-header home-page__header">
         <div>
-          <p className="home-page__eyebrow">Ultron QA Console</p>
+          <p className="home-page__eyebrow">Ultron QA 主控台</p>
           <h1>總覽</h1>
           <p>
             {isDemoMode

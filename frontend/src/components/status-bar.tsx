@@ -8,7 +8,7 @@ export function StatusBar() {
       <span>{agentOnline ? 'Agent 已連線' : 'Agent 離線 · 展示模式'}</span>
       <span className="status-bar__sep">|</span>
       <span>線上裝置 {onlineDeviceCount} 台</span>
-      {isDemoMode ? <span className="status-bar__tag">Demo</span> : null}
+      {isDemoMode ? <span className="status-bar__tag">展示</span> : null}
     </div>
   );
 }

@@ -36,6 +36,7 @@ import {
 } from '../data/script-step-catalog';
 import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
 import { mockAdvanceScriptRun } from '../lib/mock-api';
+import { formatRunStatus } from '../lib/ui-labels';
 import type { DeviceInfo } from '../types/api-types';
 import { useToast } from '../hooks/use-toast';
 
@@ -536,7 +537,7 @@ export function ScriptsPage() {
                 {runStatus.results.map((result) => (
                   <li key={result.step_index} className={`script-run-results__item script-run-results__item--${result.status}`}>
                     <span>{result.step_index + 1}. {result.step_label}</span>
-                    <span>{result.status}{result.message ? ` — ${result.message}` : ''}</span>
+                    <span>{formatRunStatus(result.status)}{result.message ? ` — ${result.message}` : ''}</span>
                   </li>
                 ))}
               </ul>

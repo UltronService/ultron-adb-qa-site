@@ -38,7 +38,7 @@ export const MOCK_DEVICES: MockDevice[] = [
     label: 'STB-Spare',
     ip: '192.168.1.105:5555',
     online: false,
-    model: 'Unknown',
+    model: '未知',
     androidVersion: '-',
     cpuPercent: 0,
     ramPercent: 0,

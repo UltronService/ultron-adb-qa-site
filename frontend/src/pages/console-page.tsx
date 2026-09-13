@@ -15,7 +15,7 @@ import { useDemoMode } from '../hooks/use-demo-mode';
 import { useToast } from '../hooks/use-toast';
 import type { DeviceInfo } from '../types/api-types';
 
-const LOG_LEVELS = ['Verbose', 'Debug', 'Info', 'Warn', 'Error'] as const;
+import { LOG_LEVEL_OPTIONS, type LogLevel } from '../lib/ui-labels';
 
 const KEY_MAP: Record<string, string> = {
   up: '19',
@@ -34,7 +34,7 @@ export function ConsolePage() {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [textInput, setTextInput] = useState('');
-  const [logLevel, setLogLevel] = useState<(typeof LOG_LEVELS)[number]>('Info');
+  const [logLevel, setLogLevel] = useState<LogLevel>('Info');
   const [logFilter, setLogFilter] = useState('');
   const [packageFilter, setPackageFilter] = useState<string>(ULTRON_PLAYER_APK_SOURCE.packageName);
   const [logs, setLogs] = useState<string[]>([]);
@@ -49,7 +49,7 @@ export function ConsolePage() {
         const result = await fetchDevices();
         setDevices(result.filter((device) => device.online));
       } catch {
-        setError('Unable to load devices');
+        setError('無法載入裝置');
       }
     };
     void load();
@@ -87,10 +87,10 @@ export function ConsolePage() {
         setLogs((prev) => [...prev.slice(-199), event.data as string]);
       };
       socket.onerror = () => {
-        setError('Logcat stream unavailable');
+        setError('Logcat 串流不可用');
       };
     } catch {
-      setError('Unable to open logcat stream');
+      setError('無法開啟 Logcat 串流');
     }
 
     return () => {
@@ -111,10 +111,10 @@ export function ConsolePage() {
       anchor.download = result.filename;
       anchor.click();
       URL.revokeObjectURL(url);
-      setExportStatus(`Exported ${result.line_count} lines${result.mock === 'true' ? ' (demo)' : ''}`);
+      setExportStatus(`已匯出 ${result.line_count} 行${result.mock === 'true' ? '（展示模式）' : ''}`);
       showToast('Log 已匯出', 'success');
     } catch (requestError) {
-      showToast(requestError instanceof Error ? requestError.message : 'Log export failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : 'Log 匯出失敗', 'error');
     }
   };
 
@@ -140,9 +140,9 @@ export function ConsolePage() {
     }
     try {
       await sendKeyEvent(selectedDevice, KEY_MAP[key] ?? key);
-      showToast(`已送出遙控鍵：${key.toUpperCase()}${isDemoMode ? '（demo）' : ''}`, 'info');
+      showToast(`已送出遙控鍵：${key.toUpperCase()}${isDemoMode ? '（展示模式）' : ''}`, 'info');
     } catch (requestError) {
-      showToast(requestError instanceof Error ? requestError.message : 'Key event failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : '遙控鍵送出失敗', 'error');
     }
   };
 
@@ -155,7 +155,7 @@ export function ConsolePage() {
       setTextInput('');
       showToast('文字已送出', 'success');
     } catch (requestError) {
-      showToast(requestError instanceof Error ? requestError.message : 'Text input failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : '文字送出失敗', 'error');
     }
   };
 
@@ -174,7 +174,7 @@ export function ConsolePage() {
       showToast('截圖已更新', 'success');
     } catch (requestError) {
       setPreviewUrl(MOCK_SCREENSHOT_DATA_URL);
-      showToast(requestError instanceof Error ? requestError.message : 'Screenshot failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : '截圖失敗', 'error');
     }
   };
 
@@ -182,8 +182,8 @@ export function ConsolePage() {
     <section className="page">
       <header className="page-header">
         <div>
-          <h1>Interactive Console</h1>
-          <p>Remote control, live preview, logcat, and quick ADB actions.</p>
+          <h1>互動主控台</h1>
+          <p>遙控操作、即時預覽、Logcat 與常用 ADB 動作。</p>
         </div>
         <select
           className="select"
@@ -202,7 +202,7 @@ export function ConsolePage() {
 
       <div className="console-grid">
         <aside className="panel">
-          <h2>Virtual Remote</h2>
+          <h2>虛擬遙控器</h2>
           <div className="remote-pad">
             <button type="button" className="remote-btn" onClick={() => void handleKey('up')}>▲</button>
             <div className="remote-row">
@@ -213,36 +213,36 @@ export function ConsolePage() {
             <button type="button" className="remote-btn" onClick={() => void handleKey('down')}>▼</button>
           </div>
           <div className="remote-row remote-row--wrap">
-            <button type="button" className="remote-btn" onClick={() => void handleKey('back')}>Back</button>
-            <button type="button" className="remote-btn" onClick={() => void handleKey('home')}>Home</button>
-            <button type="button" className="remote-btn" onClick={() => void handleKey('menu')}>Menu</button>
+            <button type="button" className="remote-btn" onClick={() => void handleKey('back')}>返回</button>
+            <button type="button" className="remote-btn" onClick={() => void handleKey('home')}>首頁</button>
+            <button type="button" className="remote-btn" onClick={() => void handleKey('menu')}>選單</button>
           </div>
           <div className="field-group">
-            <label htmlFor="adb-text">Send text</label>
+            <label htmlFor="adb-text">輸入文字</label>
             <div className="inline-field">
               <input
                 id="adb-text"
                 className="input"
                 value={textInput}
                 onChange={(event) => setTextInput(event.target.value)}
-                placeholder="Type text for focused input"
+                placeholder="輸入要送出的文字"
               />
               <button type="button" className="btn btn--primary" onClick={() => void handleSendText()}>
-                Send
+                送出
               </button>
             </div>
           </div>
         </aside>
 
         <section className="panel panel--preview">
-          <h2>Live Preview</h2>
+          <h2>即時預覽</h2>
           <div className="preview-box preview-box--live">
             <button type="button" className="preview-box__image-btn" onClick={() => setPreviewOpen(true)}>
-              <img alt="Device screenshot" src={previewUrl} className="preview-box__image" />
+              <img alt="裝置截圖" src={previewUrl} className="preview-box__image" />
             </button>
             <div className="toolbar">
               <button type="button" className="btn btn--secondary" onClick={() => void handleCapture()}>
-                Capture now
+                立即截圖
               </button>
               <button type="button" className="btn btn--ghost" onClick={() => setPreviewOpen(true)}>
                 全螢幕
@@ -258,27 +258,27 @@ export function ConsolePage() {
               <select
                 className="select"
                 value={logLevel}
-                onChange={(event) => setLogLevel(event.target.value as (typeof LOG_LEVELS)[number])}
+                onChange={(event) => setLogLevel(event.target.value as LogLevel)}
               >
-                {LOG_LEVELS.map((level) => (
-                  <option key={level} value={level}>{level}</option>
+                {LOG_LEVEL_OPTIONS.map((level) => (
+                  <option key={level.value} value={level.value}>{level.label}</option>
                 ))}
               </select>
               <input
                 className="input input--compact"
-                placeholder="Package"
+                placeholder="套件名稱"
                 value={packageFilter}
                 onChange={(event) => setPackageFilter(event.target.value)}
               />
               <input
                 className="input input--compact"
-                placeholder="Filter keyword"
+                placeholder="關鍵字篩選"
                 value={logFilter}
                 onChange={(event) => setLogFilter(event.target.value)}
               />
-              <button type="button" className="btn btn--ghost" onClick={() => setLogs([])}>Clear</button>
+              <button type="button" className="btn btn--ghost" onClick={() => setLogs([])}>清除</button>
               <button type="button" className="btn btn--secondary" onClick={() => void handleExportLogs()}>
-                Export .log
+                匯出 .log
               </button>
             </div>
           </div>
@@ -287,8 +287,8 @@ export function ConsolePage() {
         </aside>
       </div>
 
-      <Modal open={previewOpen} title="Live Preview" onClose={() => setPreviewOpen(false)}>
-        <img alt="Fullscreen preview" src={previewUrl} className="preview-modal-image" />
+      <Modal open={previewOpen} title="即時預覽" onClose={() => setPreviewOpen(false)}>
+        <img alt="全螢幕預覽" src={previewUrl} className="preview-modal-image" />
       </Modal>
     </section>
   );

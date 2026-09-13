@@ -1,10 +1,10 @@
 import type { AutomationProgressRow, AutomationRunStatus, AutomationTemplate } from '../types/api-types';
 
 export const MOCK_AUTOMATION_TEMPLATES: AutomationTemplate[] = [
-  { id: 'cold-start', name: 'Cold start time', description: 'Measure app launch to first frame.' },
-  { id: 'monkey', name: 'Monkey stress', description: 'Random UI stress with configurable taps.' },
-  { id: 'long-play', name: 'Long playback', description: 'Monitor playback stability over time.' },
-  { id: 'reboot-net', name: 'Reboot network restore', description: 'Reboot loop and verify network recovery.' },
+  { id: 'cold-start', name: '冷啟動時間', description: '量測 App 啟動至首幀的時間。' },
+  { id: 'monkey', name: 'Monkey 壓力測試', description: '可設定點擊次數的隨機 UI 壓力測試。' },
+  { id: 'long-play', name: '長時間播放', description: '監控長時間播放的穩定性。' },
+  { id: 'reboot-net', name: '重開機網路恢復', description: '重開機循環並驗證網路恢復。' },
 ];
 
 export function buildMockAutomationProgress(
@@ -13,19 +13,19 @@ export function buildMockAutomationProgress(
   tick: number,
 ): AutomationProgressRow[] {
   const stepsByTemplate: Record<string, string[]> = {
-    'cold-start': ['Launch app', 'Wait first frame', 'Capture screenshot', 'Done'],
-    monkey: ['Install APK', 'Monkey events', 'Collect crashes', 'Done'],
-    'long-play': ['Start playback', 'Monitor buffer', 'Check memory', 'Done'],
-    'reboot-net': ['Reboot STB', 'Wait boot', 'Verify network', 'Done'],
+    'cold-start': ['啟動 App', '等待首幀', '擷取截圖', '完成'],
+    monkey: ['安裝 APK', 'Monkey 事件', '收集崩潰', '完成'],
+    'long-play': ['開始播放', '監控緩衝', '檢查記憶體', '完成'],
+    'reboot-net': ['重開 STB', '等待開機', '驗證網路', '完成'],
   };
-  const steps = stepsByTemplate[templateId] ?? ['Running', 'Done'];
+  const steps = stepsByTemplate[templateId] ?? ['執行中', '完成'];
   const stepIndex = Math.min(tick, steps.length - 1);
-  const currentStep = steps[stepIndex] ?? 'Done';
+  const currentStep = steps[stepIndex] ?? '完成';
 
   return deviceLabels.map((label, index) => {
     const deviceTick = Math.max(0, tick - index);
     const deviceStepIndex = Math.min(deviceTick, steps.length - 1);
-    const step = steps[deviceStepIndex] ?? 'Done';
+    const step = steps[deviceStepIndex] ?? '完成';
     let status = 'Running';
     if (deviceStepIndex >= steps.length - 1) {
       status = index === 1 && templateId === 'monkey' ? 'Fail' : 'Pass';

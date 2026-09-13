@@ -10,7 +10,7 @@ export const MOCK_APKS: ApkInfo[] = [
     version_code: 10053,
     size_mb: 48.2,
     uploaded_at: '2026-09-07 14:30',
-    notes: 'GCS product release',
+    notes: 'GCS 正式版',
     launch_activity: ULTRON_PLAYER_APK_SOURCE.launchActivity,
   },
   {
@@ -21,7 +21,7 @@ export const MOCK_APKS: ApkInfo[] = [
     version_code: 10042,
     size_mb: 47.8,
     uploaded_at: '2026-09-05 09:15',
-    notes: 'demo flavor QA build',
+    notes: 'demo 版 QA 建置',
     launch_activity: ULTRON_PLAYER_APK_SOURCE.launchActivity,
   },
 ];

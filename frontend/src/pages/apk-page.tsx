@@ -38,7 +38,7 @@ export function ApkPage() {
         setSelectedApkId(apkList[0].id);
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to load APK data');
+      setError(requestError instanceof Error ? requestError.message : '無法載入 APK 資料');
     }
   }, [selectedApkId]);
 
@@ -64,7 +64,7 @@ export function ApkPage() {
       await loadData();
       showToast(`${file.name} 上傳完成`, 'success');
     } catch (requestError) {
-      showToast(requestError instanceof Error ? requestError.message : 'Upload failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : '上傳失敗', 'error');
     } finally {
       setUploadOpen(false);
       setUploadProgress(0);
@@ -114,7 +114,7 @@ export function ApkPage() {
       await installApk(selectedApkId, targetDeviceIds);
       showToast('安裝完成', 'success');
     } catch (requestError) {
-      showToast(requestError instanceof Error ? requestError.message : 'Install failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : '安裝失敗', 'error');
     }
   };
 
@@ -122,25 +122,25 @@ export function ApkPage() {
     <section className="page">
       <header className="page-header">
         <div>
-          <h1>APK Repository</h1>
-          <p>Upload builds, manage versions, and push installs to selected STBs.</p>
+          <h1>APK 版本庫</h1>
+          <p>上傳建置、管理版本，並推送安裝至選定的機上盒。</p>
         </div>
       </header>
 
       {error && <p className="page-footer">{error}</p>}
 
       <section className="panel">
-        <h2>Ultron Player build reference</h2>
+        <h2>Ultron Player 建置參考</h2>
         <dl className="meta-list">
-          <div><dt>App</dt><dd>{ULTRON_PLAYER_APK_SOURCE.appName}</dd></div>
-          <div><dt>Package</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.packageName}</code></dd></div>
-          <div><dt>Version code</dt><dd>{ULTRON_PLAYER_APK_SOURCE.versionCode}</dd></div>
-          <div><dt>Build</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.buildCommand}</code></dd></div>
+          <div><dt>應用程式</dt><dd>{ULTRON_PLAYER_APK_SOURCE.appName}</dd></div>
+          <div><dt>套件名稱</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.packageName}</code></dd></div>
+          <div><dt>版本代碼</dt><dd>{ULTRON_PLAYER_APK_SOURCE.versionCode}</dd></div>
+          <div><dt>建置指令</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.buildCommand}</code></dd></div>
         </dl>
       </section>
 
       <div className="upload-zone">
-        <p>Drop .apk here or click to upload</p>
+        <p>拖曳 .apk 到此處，或點擊上傳</p>
         <input
           ref={fileInputRef}
           accept=".apk"
@@ -153,7 +153,7 @@ export function ApkPage() {
           className="btn btn--primary"
           onClick={() => fileInputRef.current?.click()}
         >
-          Choose file
+          選擇檔案
         </button>
       </div>
 
@@ -161,13 +161,13 @@ export function ApkPage() {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Select</th>
-              <th>App</th>
-              <th>Package</th>
-              <th>Version</th>
-              <th>Size</th>
-              <th>Uploaded</th>
-              <th>Actions</th>
+              <th>選取</th>
+              <th>應用程式</th>
+              <th>套件名稱</th>
+              <th>版本</th>
+              <th>大小</th>
+              <th>上傳時間</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -198,7 +198,7 @@ export function ApkPage() {
       </div>
 
       <section className="panel install-panel">
-        <h2>Install to devices</h2>
+        <h2>安裝至裝置</h2>
         <div className="device-checklist">
           {devices.map((device) => (
             <label key={device.id} className="checkbox-row">
@@ -213,7 +213,7 @@ export function ApkPage() {
         </div>
         <div className="toolbar">
           <button type="button" className="btn btn--primary" onClick={() => void simulateInstall()}>
-            Install to selected
+            安裝至已選裝置
           </button>
         </div>
         <div className="progress-list">
@@ -229,20 +229,20 @@ export function ApkPage() {
         </div>
       </section>
 
-      <Drawer open={detailApk !== null} title={detailApk?.app_name ?? 'APK detail'} onClose={() => setDetailApk(null)}>
+      <Drawer open={detailApk !== null} title={detailApk?.app_name ?? 'APK 詳情'} onClose={() => setDetailApk(null)}>
         {detailApk ? (
           <dl className="meta-list meta-list--stacked">
-            <div><dt>Package</dt><dd><code>{detailApk.package_name}</code></dd></div>
-            <div><dt>Version</dt><dd>{detailApk.version_name} ({detailApk.version_code})</dd></div>
-            <div><dt>Size</dt><dd>{detailApk.size_mb} MB</dd></div>
-            <div><dt>Uploaded</dt><dd>{detailApk.uploaded_at}</dd></div>
-            <div><dt>Notes</dt><dd>{detailApk.notes || '—'}</dd></div>
-            <div><dt>Launch</dt><dd><code>{detailApk.launch_activity ?? ULTRON_PLAYER_APK_SOURCE.launchActivity}</code></dd></div>
+            <div><dt>套件名稱</dt><dd><code>{detailApk.package_name}</code></dd></div>
+            <div><dt>版本</dt><dd>{detailApk.version_name} ({detailApk.version_code})</dd></div>
+            <div><dt>大小</dt><dd>{detailApk.size_mb} MB</dd></div>
+            <div><dt>上傳時間</dt><dd>{detailApk.uploaded_at}</dd></div>
+            <div><dt>備註</dt><dd>{detailApk.notes || '—'}</dd></div>
+            <div><dt>啟動 Activity</dt><dd><code>{detailApk.launch_activity ?? ULTRON_PLAYER_APK_SOURCE.launchActivity}</code></dd></div>
           </dl>
         ) : null}
       </Drawer>
 
-      <Modal open={uploadOpen} title="Uploading APK" onClose={() => setUploadOpen(false)}>
+      <Modal open={uploadOpen} title="上傳 APK 中" onClose={() => setUploadOpen(false)}>
         <p>正在上傳… {uploadProgress}%</p>
         <div className="progress-bar">
           <div className="progress-bar__fill" style={{ width: `${uploadProgress}%` }} />

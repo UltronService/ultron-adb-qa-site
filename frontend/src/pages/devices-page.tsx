@@ -46,7 +46,7 @@ export function DevicesPage() {
       await loadDevices();
       showToast(`已加入 ${device.label}${isDemoMode ? '（展示模式）' : ''}`, 'success');
     } catch (requestError) {
-      showToast(requestError instanceof Error ? requestError.message : 'Connect failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : '連線失敗', 'error');
     }
   };
 
@@ -58,7 +58,7 @@ export function DevicesPage() {
       setDevices(result);
       showToast(`掃描完成，找到 ${result.length} 台裝置`, 'success');
     } catch (requestError) {
-      showToast(requestError instanceof Error ? requestError.message : 'Scan failed', 'error');
+      showToast(requestError instanceof Error ? requestError.message : '掃描失敗', 'error');
     } finally {
       setScanning(false);
     }
@@ -72,8 +72,8 @@ export function DevicesPage() {
     <section className="page">
       <header className="page-header">
         <div>
-          <h1>Device Dashboard</h1>
-          <p>Manage set-top boxes, scan LAN, and monitor connection status.</p>
+          <h1>裝置管理</h1>
+          <p>管理機上盒、掃描區域網路，並監控連線狀態。</p>
         </div>
         <div className="toolbar">
           <input
@@ -83,10 +83,10 @@ export function DevicesPage() {
             onChange={(event) => setIpInput(event.target.value)}
           />
           <button type="button" className="btn btn--secondary" onClick={() => void handleConnect()}>
-            Add Device
+            新增裝置
           </button>
           <button type="button" className="btn btn--primary" onClick={() => void handleScan()} disabled={scanning}>
-            {scanning ? 'Scanning…' : 'Scan LAN'}
+            {scanning ? '掃描中…' : '掃描區域網路'}
           </button>
         </div>
       </header>
@@ -129,15 +129,15 @@ export function DevicesPage() {
                 <span className={`status-dot ${device.online ? 'status-dot--online' : 'status-dot--offline'}`} />
                 <strong>{device.label}</strong>
               </label>
-              <span className="badge">{device.online ? 'Online' : 'Offline'}</span>
+              <span className="badge">{device.online ? '線上' : '離線'}</span>
             </div>
             <dl className="meta-list">
               <div><dt>IP</dt><dd>{device.ip}</dd></div>
-              <div><dt>Model</dt><dd>{device.model}</dd></div>
+              <div><dt>型號</dt><dd>{device.model}</dd></div>
               <div><dt>Android</dt><dd>{device.android_version}</dd></div>
               <div><dt>CPU</dt><dd>{device.online ? `${device.cpu_percent}%` : '-'}</dd></div>
-              <div><dt>RAM</dt><dd>{device.online ? `${device.ram_percent}%` : '-'}</dd></div>
-              <div><dt>Ping</dt><dd>{device.online ? `${device.ping_ms} ms` : '-'}</dd></div>
+              <div><dt>記憶體</dt><dd>{device.online ? `${device.ram_percent}%` : '-'}</dd></div>
+              <div><dt>延遲</dt><dd>{device.online ? `${device.ping_ms} ms` : '-'}</dd></div>
             </dl>
             <div className="device-card__actions">
               <button
@@ -157,18 +157,18 @@ export function DevicesPage() {
 
       <Drawer
         open={detailDevice !== null}
-        title={detailDevice?.label ?? 'Device detail'}
+        title={detailDevice?.label ?? '裝置詳情'}
         onClose={() => setDetailDevice(null)}
       >
         {detailDevice ? (
           <>
             <dl className="meta-list meta-list--stacked">
-              <div><dt>Device ID</dt><dd><code>{detailDevice.id}</code></dd></div>
+              <div><dt>裝置 ID</dt><dd><code>{detailDevice.id}</code></dd></div>
               <div><dt>IP</dt><dd>{detailDevice.ip}</dd></div>
-              <div><dt>Model</dt><dd>{detailDevice.model}</dd></div>
+              <div><dt>型號</dt><dd>{detailDevice.model}</dd></div>
               <div><dt>Android</dt><dd>{detailDevice.android_version}</dd></div>
-              <div><dt>Status</dt><dd>{detailDevice.online ? 'Online' : 'Offline'}</dd></div>
-              <div><dt>Last seen</dt><dd>{isDemoMode ? '剛剛（展示模式）' : '—'}</dd></div>
+              <div><dt>狀態</dt><dd>{detailDevice.online ? '線上' : '離線'}</dd></div>
+              <div><dt>最後連線</dt><dd>{isDemoMode ? '剛剛（展示模式）' : '—'}</dd></div>
             </dl>
             <p className="page-footer">點選卡片可查看規格；勾選後可用上方批次操作列。</p>
           </>
@@ -176,7 +176,7 @@ export function DevicesPage() {
       </Drawer>
 
       <footer className="page-footer">
-        Selected: {selectedIds.length} device(s)
+        已選 {selectedIds.length} 台裝置
       </footer>
     </section>
   );

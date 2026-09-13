@@ -131,6 +131,7 @@ a { color: inherit; text-decoration: none; }
 .status-pill--pass { background: #1b5e20; }
 .status-pill--fail { background: #b71c1c; }
 .status-pill--running { background: #1565c0; }
+.status-pill--pending { background: #455a64; }
 
 .tab-row { display: flex; gap: 0.35rem; }
 .tab { background: #1f2a38; border: 1px solid #334155; color: #e8edf5; padding: 0.4rem 0.75rem; border-radius: 0.45rem; cursor: pointer; }

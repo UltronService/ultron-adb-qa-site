@@ -8,6 +8,7 @@ import {
 import { fetchDevices } from '../api/device-api';
 import { Drawer } from '../components/ui/drawer';
 import { mockAdvanceAutomationRun, mockStopAutomationRun } from '../lib/mock-api';
+import { formatRunStatus, runStatusClass } from '../lib/ui-labels';
 import { useToast } from '../hooks/use-toast';
 import type { AutomationProgressRow, AutomationTemplate, DeviceInfo } from '../types/api-types';
 
@@ -37,7 +38,7 @@ export function AutomationPage() {
         setSelectedTemplate(templateList[0].id);
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to load automation data');
+      setError(requestError instanceof Error ? requestError.message : '無法載入自動化資料');
     }
   }, [selectedTemplate]);
 
@@ -91,7 +92,7 @@ export function AutomationPage() {
       setProgress(status.progress);
       showToast('批次測試已開始', 'info');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Run failed');
+      setError(requestError instanceof Error ? requestError.message : '執行失敗');
     }
   };
 
@@ -110,16 +111,16 @@ export function AutomationPage() {
     <section className="page">
       <header className="page-header">
         <div>
-          <h1>Test Automation</h1>
-          <p>Run scripted tests across multiple set-top boxes.</p>
+          <h1>測試自動化</h1>
+          <p>選擇模板與裝置，批次執行腳本測試。</p>
         </div>
         <div className="toolbar">
           <button type="button" className="btn btn--primary" onClick={() => void handleRun()}>
-            Run batch
+            執行批次
           </button>
           {runId && runState === 'running' ? (
             <button type="button" className="btn btn--danger" onClick={handleStop}>
-              Stop
+              停止
             </button>
           ) : null}
           {progress.length > 0 ? (
@@ -134,7 +135,7 @@ export function AutomationPage() {
 
       <div className="automation-layout">
         <section className="panel">
-          <h2>Templates</h2>
+          <h2>測試模板</h2>
           <div className="template-grid">
             {templates.map((template) => (
               <button
@@ -153,10 +154,10 @@ export function AutomationPage() {
             ))}
           </div>
 
-          <h3>Parameters</h3>
+          <h3>參數</h3>
           <div className="field-grid">
             <label className="field-group">
-              Monkey events
+              Monkey 事件數
               <input
                 className="input"
                 value={monkeyEvents}
@@ -164,7 +165,7 @@ export function AutomationPage() {
               />
             </label>
             <label className="field-group">
-              Duration (minutes)
+              持續時間（分鐘）
               <input
                 className="input"
                 value={durationMinutes}
@@ -173,7 +174,7 @@ export function AutomationPage() {
             </label>
           </div>
 
-          <h3>Target devices</h3>
+          <h3>目標裝置</h3>
           <div className="device-checklist">
             {devices.map((device) => (
               <label key={device.id} className="checkbox-row">
@@ -189,20 +190,20 @@ export function AutomationPage() {
         </section>
 
         <section className="panel">
-          <h2>Live progress</h2>
+          <h2>即時進度</h2>
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Device</th>
-                  <th>Current step</th>
-                  <th>Status</th>
+                  <th>裝置</th>
+                  <th>目前步驟</th>
+                  <th>狀態</th>
                 </tr>
               </thead>
               <tbody>
                 {progress.length === 0 ? (
                   <tr>
-                    <td colSpan={3}>按 Run batch 開始模擬進度</td>
+                    <td colSpan={3}>按「執行批次」開始模擬進度</td>
                   </tr>
                 ) : (
                   progress.map((row, index) => (
@@ -210,8 +211,8 @@ export function AutomationPage() {
                       <td>{row.device_label}</td>
                       <td>{row.step}</td>
                       <td>
-                        <span className={`status-pill status-pill--${row.status.toLowerCase()}`}>
-                          {row.status}
+                        <span className={`status-pill status-pill--${runStatusClass(row.status)}`}>
+                          {formatRunStatus(row.status)}
                         </span>
                       </td>
                     </tr>
@@ -229,7 +230,7 @@ export function AutomationPage() {
             <li key={`${row.device_label}-timeline-${index}`}>
               <strong>{row.device_label}</strong>
               <span>{row.step}</span>
-              <span className={`status-pill status-pill--${row.status.toLowerCase()}`}>{row.status}</span>
+              <span className={`status-pill status-pill--${runStatusClass(row.status)}`}>{formatRunStatus(row.status)}</span>
             </li>
           ))}
         </ul>
