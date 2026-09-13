@@ -1,16 +1,32 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchApks, installApk, uploadApk } from '../api/apk-api';
 import { fetchDevices } from '../api/device-api';
+import { Drawer } from '../components/ui/drawer';
+import { Modal } from '../components/ui/modal';
 import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
+import { useDemoMode } from '../hooks/use-demo-mode';
+import { useToast } from '../hooks/use-toast';
 import type { ApkInfo, DeviceInfo } from '../types/api-types';
 
+interface InstallProgressRow {
+  deviceId: string;
+  label: string;
+  phase: string;
+  percent: number;
+}
+
 export function ApkPage() {
+  const { isDemoMode } = useDemoMode();
+  const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [apks, setApks] = useState<ApkInfo[]>([]);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedApkId, setSelectedApkId] = useState('');
   const [targetDeviceIds, setTargetDeviceIds] = useState<string[]>([]);
-  const [installResults, setInstallResults] = useState<Record<string, string>>({});
+  const [detailApk, setDetailApk] = useState<ApkInfo | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [installRows, setInstallRows] = useState<InstallProgressRow[]>([]);
   const [error, setError] = useState('');
 
   const loadData = useCallback(async () => {
@@ -36,27 +52,69 @@ export function ApkPage() {
     );
   };
 
+  const simulateUpload = async (file: File) => {
+    setUploadOpen(true);
+    setUploadProgress(0);
+    for (let step = 1; step <= 5; step += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      setUploadProgress(step * 20);
+    }
+    try {
+      await uploadApk(file, isDemoMode ? 'demo upload' : '');
+      await loadData();
+      showToast(`${file.name} 上傳完成`, 'success');
+    } catch (requestError) {
+      showToast(requestError instanceof Error ? requestError.message : 'Upload failed', 'error');
+    } finally {
+      setUploadOpen(false);
+      setUploadProgress(0);
+    }
+  };
+
   const handleUpload = async (file: File | undefined) => {
     if (!file) {
       return;
     }
-    try {
-      await uploadApk(file, '');
-      await loadData();
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Upload failed');
-    }
+    await simulateUpload(file);
   };
 
-  const handleInstall = async () => {
+  const simulateInstall = async () => {
     if (!selectedApkId || targetDeviceIds.length === 0) {
       return;
     }
+    const rows: InstallProgressRow[] = targetDeviceIds.map((deviceId) => ({
+      deviceId,
+      label: devices.find((d) => d.id === deviceId)?.label ?? deviceId,
+      phase: '準備中',
+      percent: 0,
+    }));
+    setInstallRows(rows);
+
+    for (const row of rows) {
+      setInstallRows((prev) =>
+        prev.map((item) =>
+          item.deviceId === row.deviceId ? { ...item, phase: '傳輸 APK', percent: 35 } : item,
+        ),
+      );
+      await new Promise((resolve) => window.setTimeout(resolve, 400));
+      setInstallRows((prev) =>
+        prev.map((item) =>
+          item.deviceId === row.deviceId ? { ...item, phase: '安裝中', percent: 70 } : item,
+        ),
+      );
+      await new Promise((resolve) => window.setTimeout(resolve, 400));
+      setInstallRows((prev) =>
+        prev.map((item) =>
+          item.deviceId === row.deviceId ? { ...item, phase: '啟動 App', percent: 100 } : item,
+        ),
+      );
+    }
+
     try {
-      const results = await installApk(selectedApkId, targetDeviceIds);
-      setInstallResults(results);
+      await installApk(selectedApkId, targetDeviceIds);
+      showToast('安裝完成', 'success');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Install failed');
+      showToast(requestError instanceof Error ? requestError.message : 'Install failed', 'error');
     }
   };
 
@@ -78,8 +136,6 @@ export function ApkPage() {
           <div><dt>Package</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.packageName}</code></dd></div>
           <div><dt>Version code</dt><dd>{ULTRON_PLAYER_APK_SOURCE.versionCode}</dd></div>
           <div><dt>Build</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.buildCommand}</code></dd></div>
-          <div><dt>Output</dt><dd><code>{ULTRON_PLAYER_APK_SOURCE.outputPath}</code></dd></div>
-          <div><dt>Flavor</dt><dd>{ULTRON_PLAYER_APK_SOURCE.recommendedFlavor}</dd></div>
         </dl>
       </section>
 
@@ -109,10 +165,9 @@ export function ApkPage() {
               <th>App</th>
               <th>Package</th>
               <th>Version</th>
-              <th>Code</th>
               <th>Size</th>
               <th>Uploaded</th>
-              <th>Notes</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -128,11 +183,14 @@ export function ApkPage() {
                 </td>
                 <td>{apk.app_name}</td>
                 <td><code>{apk.package_name}</code></td>
-                <td>{apk.version_name}</td>
-                <td>{apk.version_code}</td>
+                <td>{apk.version_name} ({apk.version_code})</td>
                 <td>{apk.size_mb} MB</td>
                 <td>{apk.uploaded_at}</td>
-                <td>{apk.notes}</td>
+                <td>
+                  <button type="button" className="btn btn--ghost" onClick={() => setDetailApk(apk)}>
+                    詳情
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -154,19 +212,42 @@ export function ApkPage() {
           ))}
         </div>
         <div className="toolbar">
-          <button type="button" className="btn btn--primary" onClick={() => void handleInstall()}>
+          <button type="button" className="btn btn--primary" onClick={() => void simulateInstall()}>
             Install to selected
           </button>
         </div>
         <div className="progress-list">
-          {Object.entries(installResults).map(([deviceId, status]) => (
-            <div key={deviceId} className="progress-item">
-              <span>{deviceId}</span>
-              <span>{status}</span>
+          {installRows.map((row) => (
+            <div key={row.deviceId} className="progress-item progress-item--stacked">
+              <span>{row.label}</span>
+              <div className="progress-bar">
+                <div className="progress-bar__fill" style={{ width: `${row.percent}%` }} />
+              </div>
+              <span>{row.phase}</span>
             </div>
           ))}
         </div>
       </section>
+
+      <Drawer open={detailApk !== null} title={detailApk?.app_name ?? 'APK detail'} onClose={() => setDetailApk(null)}>
+        {detailApk ? (
+          <dl className="meta-list meta-list--stacked">
+            <div><dt>Package</dt><dd><code>{detailApk.package_name}</code></dd></div>
+            <div><dt>Version</dt><dd>{detailApk.version_name} ({detailApk.version_code})</dd></div>
+            <div><dt>Size</dt><dd>{detailApk.size_mb} MB</dd></div>
+            <div><dt>Uploaded</dt><dd>{detailApk.uploaded_at}</dd></div>
+            <div><dt>Notes</dt><dd>{detailApk.notes || '—'}</dd></div>
+            <div><dt>Launch</dt><dd><code>{detailApk.launch_activity ?? ULTRON_PLAYER_APK_SOURCE.launchActivity}</code></dd></div>
+          </dl>
+        ) : null}
+      </Drawer>
+
+      <Modal open={uploadOpen} title="Uploading APK" onClose={() => setUploadOpen(false)}>
+        <p>正在上傳… {uploadProgress}%</p>
+        <div className="progress-bar">
+          <div className="progress-bar__fill" style={{ width: `${uploadProgress}%` }} />
+        </div>
+      </Modal>
     </section>
   );
 }

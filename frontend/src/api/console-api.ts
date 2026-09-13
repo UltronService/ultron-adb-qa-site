@@ -1,3 +1,5 @@
+import { MOCK_LOGCAT_LINES } from '../data/mock-logcat';
+import { mockCaptureScreenshot, mockExportLogcat } from '../lib/mock-api';
 import { agentRequest, getAgentWebSocketBase } from './agent-client';
 
 interface ScreenshotResponse {
@@ -6,23 +8,37 @@ interface ScreenshotResponse {
 }
 
 export async function captureScreenshot(deviceId: string): Promise<ScreenshotResponse> {
-  return agentRequest<ScreenshotResponse>(`/api/console/${deviceId}/screenshot`, {
-    method: 'POST',
-  });
+  try {
+    return await agentRequest<ScreenshotResponse>(`/api/console/${deviceId}/screenshot`, {
+      method: 'POST',
+    });
+  } catch {
+    return mockCaptureScreenshot();
+  }
 }
 
 export async function sendKeyEvent(deviceId: string, keycode: string): Promise<void> {
-  await agentRequest(`/api/console/${deviceId}/key`, {
-    method: 'POST',
-    body: JSON.stringify({ keycode }),
-  });
+  try {
+    await agentRequest(`/api/console/${deviceId}/key`, {
+      method: 'POST',
+      body: JSON.stringify({ keycode }),
+    });
+  } catch {
+    void deviceId;
+    void keycode;
+  }
 }
 
 export async function sendTextInput(deviceId: string, text: string): Promise<void> {
-  await agentRequest(`/api/console/${deviceId}/text`, {
-    method: 'POST',
-    body: JSON.stringify({ text }),
-  });
+  try {
+    await agentRequest(`/api/console/${deviceId}/text`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  } catch {
+    void deviceId;
+    void text;
+  }
 }
 
 export interface LogcatStreamOptions {
@@ -44,6 +60,10 @@ export function openLogcatStream(deviceId: string, options: LogcatStreamOptions 
   return new WebSocket(`${wsBase}/api/console/${deviceId}/logcat${suffix}`);
 }
 
+export function getMockLogcatLines(): string[] {
+  return MOCK_LOGCAT_LINES;
+}
+
 export interface LogcatExportResponse {
   filename: string;
   line_count: number;
@@ -56,11 +76,15 @@ export async function exportLogcat(
   packageName: string,
   logLevel: string,
 ): Promise<LogcatExportResponse> {
-  return agentRequest<LogcatExportResponse>(`/api/console/${deviceId}/logcat/export`, {
-    method: 'POST',
-    body: JSON.stringify({
-      package_name: packageName,
-      log_level: logLevel,
-    }),
-  });
+  try {
+    return await agentRequest<LogcatExportResponse>(`/api/console/${deviceId}/logcat/export`, {
+      method: 'POST',
+      body: JSON.stringify({
+        package_name: packageName,
+        log_level: logLevel,
+      }),
+    });
+  } catch {
+    return mockExportLogcat(packageName, logLevel);
+  }
 }

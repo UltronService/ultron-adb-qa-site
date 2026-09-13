@@ -21,6 +21,7 @@ import {
   deleteScript,
   fetchScriptRunStatus,
   fetchScripts,
+  isMockScriptRun,
   runScriptTrial,
   updateScript,
 } from '../api/scripts-api';
@@ -34,7 +35,9 @@ import {
   type TestScript,
 } from '../data/script-step-catalog';
 import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
+import { mockAdvanceScriptRun } from '../lib/mock-api';
 import type { DeviceInfo } from '../types/api-types';
+import { useToast } from '../hooks/use-toast';
 
 interface SortableStepProps {
   step: ScriptStep;
@@ -201,6 +204,7 @@ function StepEditor({
 }
 
 export function ScriptsPage() {
+  const { showToast } = useToast();
   const [scripts, setScripts] = useState<TestScript[]>([]);
   const [activeScript, setActiveScript] = useState<TestScript | null>(null);
   const [selectedStepId, setSelectedStepId] = useState('');
@@ -254,6 +258,9 @@ export function ScriptsPage() {
 
     const timer = window.setInterval(async () => {
       try {
+        if (isMockScriptRun(runStatus.run_id)) {
+          mockAdvanceScriptRun(runStatus.run_id);
+        }
         const status = await fetchScriptRunStatus(runStatus.run_id);
         setRunStatus(status);
         if (status.state !== 'running') {
@@ -265,6 +272,7 @@ export function ScriptsPage() {
                 ? '試跑失敗'
                 : '試跑已停止',
           );
+          showToast(status.state === 'completed' ? '試跑完成' : '試跑結束', 'success');
           window.clearInterval(timer);
         }
       } catch {
@@ -307,6 +315,7 @@ export function ScriptsPage() {
       setScripts((prev) => prev.map((item) => (item.id === saved.id ? saved : item)));
       setActiveScript(saved);
       setStatusMessage('劇本已儲存');
+      showToast('劇本已儲存', 'success');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : '儲存失敗');
     }

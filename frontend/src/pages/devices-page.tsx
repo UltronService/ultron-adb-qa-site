@@ -1,41 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import { connectDevice, fetchDevices, scanDevices } from '../api/device-api';
-import { MOCK_DEVICES } from '../data/mock-devices';
+import { Drawer } from '../components/ui/drawer';
+import { Skeleton } from '../components/ui/skeleton';
+import { useDemoMode } from '../hooks/use-demo-mode';
+import { useToast } from '../hooks/use-toast';
 import type { DeviceInfo } from '../types/api-types';
 
-function mapMockToApi(device: (typeof MOCK_DEVICES)[number]): DeviceInfo {
-  return {
-    id: device.id,
-    label: device.label,
-    ip: device.ip,
-    online: device.online,
-    model: device.model,
-    android_version: device.androidVersion,
-    cpu_percent: device.cpuPercent,
-    ram_percent: device.ramPercent,
-    ping_ms: device.pingMs,
-  };
-}
-
 export function DevicesPage() {
+  const { isDemoMode } = useDemoMode();
+  const { showToast } = useToast();
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [ipInput, setIpInput] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [usingMock, setUsingMock] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [detailDevice, setDetailDevice] = useState<DeviceInfo | null>(null);
 
   const loadDevices = useCallback(async () => {
     setLoading(true);
-    setError('');
     try {
       const result = await fetchDevices();
       setDevices(result);
-      setUsingMock(false);
-    } catch {
-      setDevices(MOCK_DEVICES.map(mapMockToApi));
-      setUsingMock(true);
-      setError('Agent 離線，顯示 mock 資料');
     } finally {
       setLoading(false);
     }
@@ -56,22 +41,31 @@ export function DevicesPage() {
       return;
     }
     try {
-      await connectDevice(ipInput.trim());
+      const device = await connectDevice(ipInput.trim());
       setIpInput('');
       await loadDevices();
+      showToast(`已加入 ${device.label}${isDemoMode ? '（展示模式）' : ''}`, 'success');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Connect failed');
+      showToast(requestError instanceof Error ? requestError.message : 'Connect failed', 'error');
     }
   };
 
   const handleScan = async () => {
+    setScanning(true);
+    await new Promise((resolve) => window.setTimeout(resolve, 900));
     try {
       const result = await scanDevices();
       setDevices(result);
-      setUsingMock(false);
+      showToast(`掃描完成，找到 ${result.length} 台裝置`, 'success');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Scan failed');
+      showToast(requestError instanceof Error ? requestError.message : 'Scan failed', 'error');
+    } finally {
+      setScanning(false);
     }
+  };
+
+  const handleBatchAction = (action: string) => {
+    showToast(`已對 ${selectedIds.length} 台裝置執行「${action}」（展示模式模擬）`, 'info');
   };
 
   return (
@@ -91,21 +85,42 @@ export function DevicesPage() {
           <button type="button" className="btn btn--secondary" onClick={() => void handleConnect()}>
             Add Device
           </button>
-          <button type="button" className="btn btn--primary" onClick={() => void handleScan()}>
-            Scan LAN
+          <button type="button" className="btn btn--primary" onClick={() => void handleScan()} disabled={scanning}>
+            {scanning ? 'Scanning…' : 'Scan LAN'}
           </button>
         </div>
       </header>
 
-      {loading && <p className="page-footer">Loading devices...</p>}
-      {error && <p className="page-footer">{error}</p>}
-      {usingMock && !loading && <p className="page-footer">Agent offline — showing mock data.</p>}
+      {selectedIds.length > 0 ? (
+        <div className="batch-bar">
+          <span>已選 {selectedIds.length} 台</span>
+          <button type="button" className="btn btn--secondary" onClick={() => handleBatchAction('重新連線')}>
+            重新連線
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={() => handleBatchAction('中斷連線')}>
+            中斷連線
+          </button>
+        </div>
+      ) : null}
+
+      {loading || scanning ? <Skeleton lines={4} /> : null}
 
       <div className="device-grid">
         {devices.map((device) => (
-          <article key={device.id} className="device-card">
+          <article
+            key={device.id}
+            className="device-card device-card--clickable"
+            onClick={() => setDetailDevice(device)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                setDetailDevice(device);
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
             <div className="device-card__top">
-              <label className="checkbox-row">
+              <label className="checkbox-row" onClick={(event) => event.stopPropagation()}>
                 <input
                   checked={selectedIds.includes(device.id)}
                   type="checkbox"
@@ -124,9 +139,41 @@ export function DevicesPage() {
               <div><dt>RAM</dt><dd>{device.online ? `${device.ram_percent}%` : '-'}</dd></div>
               <div><dt>Ping</dt><dd>{device.online ? `${device.ping_ms} ms` : '-'}</dd></div>
             </dl>
+            <div className="device-card__actions">
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setDetailDevice(device);
+                }}
+              >
+                詳情
+              </button>
+            </div>
           </article>
         ))}
       </div>
+
+      <Drawer
+        open={detailDevice !== null}
+        title={detailDevice?.label ?? 'Device detail'}
+        onClose={() => setDetailDevice(null)}
+      >
+        {detailDevice ? (
+          <>
+            <dl className="meta-list meta-list--stacked">
+              <div><dt>Device ID</dt><dd><code>{detailDevice.id}</code></dd></div>
+              <div><dt>IP</dt><dd>{detailDevice.ip}</dd></div>
+              <div><dt>Model</dt><dd>{detailDevice.model}</dd></div>
+              <div><dt>Android</dt><dd>{detailDevice.android_version}</dd></div>
+              <div><dt>Status</dt><dd>{detailDevice.online ? 'Online' : 'Offline'}</dd></div>
+              <div><dt>Last seen</dt><dd>{isDemoMode ? '剛剛（展示模式）' : '—'}</dd></div>
+            </dl>
+            <p className="page-footer">點選卡片可查看規格；勾選後可用上方批次操作列。</p>
+          </>
+        ) : null}
+      </Drawer>
 
       <footer className="page-footer">
         Selected: {selectedIds.length} device(s)

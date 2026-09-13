@@ -2,13 +2,17 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   captureScreenshot,
   exportLogcat,
+  getMockLogcatLines,
   openLogcatStream,
   sendKeyEvent,
   sendTextInput,
 } from '../api/console-api';
+import { Modal } from '../components/ui/modal';
+import { MOCK_SCREENSHOT_DATA_URL } from '../data/mock-screenshot';
 import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
 import { fetchDevices } from '../api/device-api';
-import { MOCK_DEVICES } from '../data/mock-devices';
+import { useDemoMode } from '../hooks/use-demo-mode';
+import { useToast } from '../hooks/use-toast';
 import type { DeviceInfo } from '../types/api-types';
 
 const LOG_LEVELS = ['Verbose', 'Debug', 'Info', 'Warn', 'Error'] as const;
@@ -25,6 +29,8 @@ const KEY_MAP: Record<string, string> = {
 };
 
 export function ConsolePage() {
+  const { isDemoMode } = useDemoMode();
+  const { showToast } = useToast();
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [textInput, setTextInput] = useState('');
@@ -33,7 +39,8 @@ export function ConsolePage() {
   const [packageFilter, setPackageFilter] = useState<string>(ULTRON_PLAYER_APK_SOURCE.packageName);
   const [logs, setLogs] = useState<string[]>([]);
   const [exportStatus, setExportStatus] = useState('');
-  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewUrl, setPreviewUrl] = useState(MOCK_SCREENSHOT_DATA_URL);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -42,20 +49,7 @@ export function ConsolePage() {
         const result = await fetchDevices();
         setDevices(result.filter((device) => device.online));
       } catch {
-        setDevices(
-          MOCK_DEVICES.filter((device) => device.online).map((device) => ({
-            id: device.id,
-            label: device.label,
-            ip: device.ip,
-            online: device.online,
-            model: device.model,
-            android_version: device.androidVersion,
-            cpu_percent: device.cpuPercent,
-            ram_percent: device.ramPercent,
-            ping_ms: device.pingMs,
-          })),
-        );
-        setError('Agent offline — remote actions may not work.');
+        setError('Unable to load devices');
       }
     };
     void load();
@@ -72,6 +66,17 @@ export function ConsolePage() {
       return;
     }
 
+    if (isDemoMode) {
+      setLogs(getMockLogcatLines());
+      let index = 0;
+      const timer = window.setInterval(() => {
+        const line = getMockLogcatLines()[index % getMockLogcatLines().length];
+        setLogs((prev) => [...prev.slice(-199), `[${new Date().toISOString().slice(11, 19)}] ${line}`]);
+        index += 1;
+      }, 1800);
+      return () => window.clearInterval(timer);
+    }
+
     let socket: WebSocket | null = null;
     try {
       socket = openLogcatStream(selectedDevice, {
@@ -79,7 +84,7 @@ export function ConsolePage() {
         level: logLevel,
       });
       socket.onmessage = (event) => {
-        setLogs((prev) => [...prev.slice(-199), event.data]);
+        setLogs((prev) => [...prev.slice(-199), event.data as string]);
       };
       socket.onerror = () => {
         setError('Logcat stream unavailable');
@@ -91,7 +96,7 @@ export function ConsolePage() {
     return () => {
       socket?.close();
     };
-  }, [selectedDevice, packageFilter, logLevel]);
+  }, [selectedDevice, packageFilter, logLevel, isDemoMode]);
 
   const handleExportLogs = async () => {
     if (!selectedDevice) {
@@ -106,9 +111,10 @@ export function ConsolePage() {
       anchor.download = result.filename;
       anchor.click();
       URL.revokeObjectURL(url);
-      setExportStatus(`Exported ${result.line_count} lines${result.mock === 'true' ? ' (mock)' : ''}`);
+      setExportStatus(`Exported ${result.line_count} lines${result.mock === 'true' ? ' (demo)' : ''}`);
+      showToast('Log 已匯出', 'success');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Log export failed');
+      showToast(requestError instanceof Error ? requestError.message : 'Log export failed', 'error');
     }
   };
 
@@ -119,7 +125,9 @@ export function ConsolePage() {
           return false;
         }
         if (logLevel !== 'Verbose' && !line.includes(`[${logLevel}]`)) {
-          return logLevel === 'Info' ? line.includes('[Info]') || line.includes('[Warn]') || line.includes('[Error]') : line.includes(`[${logLevel}]`);
+          return logLevel === 'Info'
+            ? line.includes('[Info]') || line.includes('[Warn]') || line.includes('[Error]')
+            : line.includes(`[${logLevel}]`);
         }
         return true;
       }),
@@ -132,8 +140,9 @@ export function ConsolePage() {
     }
     try {
       await sendKeyEvent(selectedDevice, KEY_MAP[key] ?? key);
+      showToast(`已送出遙控鍵：${key.toUpperCase()}${isDemoMode ? '（demo）' : ''}`, 'info');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Key event failed');
+      showToast(requestError instanceof Error ? requestError.message : 'Key event failed', 'error');
     }
   };
 
@@ -144,8 +153,9 @@ export function ConsolePage() {
     try {
       await sendTextInput(selectedDevice, textInput.trim());
       setTextInput('');
+      showToast('文字已送出', 'success');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Text input failed');
+      showToast(requestError instanceof Error ? requestError.message : 'Text input failed', 'error');
     }
   };
 
@@ -156,10 +166,15 @@ export function ConsolePage() {
     try {
       const result = await captureScreenshot(selectedDevice);
       if (result.image_base64) {
-        setPreviewUrl(`data:image/png;base64,${result.image_base64}`);
+        const mime = result.mock === 'true' ? 'image/svg+xml' : 'image/png';
+        setPreviewUrl(`data:${mime};base64,${result.image_base64}`);
+      } else {
+        setPreviewUrl(MOCK_SCREENSHOT_DATA_URL);
       }
+      showToast('截圖已更新', 'success');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Screenshot failed');
+      setPreviewUrl(MOCK_SCREENSHOT_DATA_URL);
+      showToast(requestError instanceof Error ? requestError.message : 'Screenshot failed', 'error');
     }
   };
 
@@ -221,15 +236,18 @@ export function ConsolePage() {
 
         <section className="panel panel--preview">
           <h2>Live Preview</h2>
-          <div className="preview-box">
-            {previewUrl ? (
-              <img alt="Device screenshot" src={previewUrl} style={{ maxWidth: '100%' }} />
-            ) : (
-              <span>Screenshot / mirror preview</span>
-            )}
-            <button type="button" className="btn btn--secondary" onClick={() => void handleCapture()}>
-              Capture now
+          <div className="preview-box preview-box--live">
+            <button type="button" className="preview-box__image-btn" onClick={() => setPreviewOpen(true)}>
+              <img alt="Device screenshot" src={previewUrl} className="preview-box__image" />
             </button>
+            <div className="toolbar">
+              <button type="button" className="btn btn--secondary" onClick={() => void handleCapture()}>
+                Capture now
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => setPreviewOpen(true)}>
+                全螢幕
+              </button>
+            </div>
           </div>
         </section>
 
@@ -268,6 +286,10 @@ export function ConsolePage() {
           <pre className="log-view">{filteredLogs.join('\n')}</pre>
         </aside>
       </div>
+
+      <Modal open={previewOpen} title="Live Preview" onClose={() => setPreviewOpen(false)}>
+        <img alt="Fullscreen preview" src={previewUrl} className="preview-modal-image" />
+      </Modal>
     </section>
   );
 }

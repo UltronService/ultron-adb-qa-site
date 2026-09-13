@@ -187,3 +187,175 @@ a { color: inherit; text-decoration: none; }
 .script-run-results__item--fail { color: #ef5350; }
 .script-run-results__item--running { color: #64b5f6; }
 .script-run-results__item--pending { color: #a8b3c5; }
+
+.demo-banner {
+  background: #1e3a5f;
+  color: #90caf9;
+  text-align: center;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #243041;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1.25rem;
+  font-size: 0.8rem;
+  color: #a8b3c5;
+  background: #111820;
+  border-bottom: 1px solid #243041;
+}
+.status-bar__dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; }
+.status-bar__dot--online { background: #4caf50; }
+.status-bar__dot--offline { background: #ef5350; }
+.status-bar__sep { opacity: 0.4; }
+.status-bar__tag {
+  margin-left: auto;
+  background: #243041;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.toast-viewport {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(360px, calc(100vw - 2rem));
+}
+.toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.5rem;
+  border: 1px solid #334155;
+  background: #1f2a38;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.toast--success { border-color: #2e7d32; }
+.toast--error { border-color: #c62828; }
+.toast--info { border-color: #1565c0; }
+.toast__close {
+  background: transparent;
+  border: none;
+  color: #a8b3c5;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.overlay--drawer { justify-content: flex-end; }
+
+.modal {
+  width: min(560px, 100%);
+  max-height: min(85vh, 900px);
+  overflow: auto;
+  background: #151b24;
+  border: 1px solid #243041;
+  border-radius: 0.75rem;
+}
+.modal__header, .drawer__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-bottom: 1px solid #243041;
+}
+.modal__header h2, .drawer__header h2 { margin: 0; font-size: 1.1rem; }
+.modal__body, .drawer__body { padding: 1rem; }
+.modal__footer { padding: 0.75rem 1rem 1rem; border-top: 1px solid #243041; }
+
+.drawer {
+  width: min(420px, 100%);
+  height: 100%;
+  background: #151b24;
+  border-left: 1px solid #243041;
+  overflow: auto;
+}
+
+.skeleton-block { display: flex; flex-direction: column; gap: 0.5rem; }
+.skeleton-line {
+  height: 0.85rem;
+  border-radius: 0.35rem;
+  background: linear-gradient(90deg, #1f2a38 25%, #2a3648 50%, #1f2a38 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.2s infinite;
+}
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  background: #151b24;
+  border: 1px solid #243041;
+  border-radius: 0.5rem;
+}
+
+.device-card--clickable { cursor: pointer; }
+.device-card--clickable:hover { border-color: #3d5afe; }
+.meta-list--stacked { grid-template-columns: 1fr; }
+
+.preview-box--live { min-height: 320px; }
+.preview-box__image-btn {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: zoom-in;
+  max-width: 100%;
+}
+.preview-box__image {
+  max-width: 100%;
+  border-radius: 0.35rem;
+  border: 1px solid #243041;
+}
+.preview-modal-image { width: 100%; border-radius: 0.35rem; }
+
+.progress-item--stacked {
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.timeline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.timeline-list li {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #243041;
+}
+
+.diff-image--mock-a { background: linear-gradient(135deg, #1a237e, #0d47a1); }
+.diff-image--mock-b { background: linear-gradient(135deg, #1b5e20, #2e7d32); }

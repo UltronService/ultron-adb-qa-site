@@ -2,12 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   fetchAutomationRunStatus,
   fetchAutomationTemplates,
+  isMockAutomationRun,
   startAutomationRun,
 } from '../api/automation-api';
 import { fetchDevices } from '../api/device-api';
+import { Drawer } from '../components/ui/drawer';
+import { mockAdvanceAutomationRun, mockStopAutomationRun } from '../lib/mock-api';
+import { useToast } from '../hooks/use-toast';
 import type { AutomationProgressRow, AutomationTemplate, DeviceInfo } from '../types/api-types';
 
 export function AutomationPage() {
+  const { showToast } = useToast();
   const [templates, setTemplates] = useState<AutomationTemplate[]>([]);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -16,6 +21,8 @@ export function AutomationPage() {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [progress, setProgress] = useState<AutomationProgressRow[]>([]);
   const [runId, setRunId] = useState('');
+  const [runState, setRunState] = useState('');
+  const [detailOpen, setDetailOpen] = useState(false);
   const [error, setError] = useState('');
 
   const loadInitial = useCallback(async () => {
@@ -39,16 +46,21 @@ export function AutomationPage() {
   }, [loadInitial]);
 
   useEffect(() => {
-    if (!runId) {
+    if (!runId || runState === 'completed' || runState === 'stopped') {
       return;
     }
 
     const timer = window.setInterval(async () => {
       try {
+        if (isMockAutomationRun(runId)) {
+          mockAdvanceAutomationRun(runId);
+        }
         const status = await fetchAutomationRunStatus(runId);
         setProgress(status.progress);
-        if (status.state === 'completed') {
+        setRunState(status.state);
+        if (status.state === 'completed' || status.state === 'stopped') {
           window.clearInterval(timer);
+          showToast(status.state === 'completed' ? '批次測試完成' : '已停止', 'success');
         }
       } catch {
         window.clearInterval(timer);
@@ -56,7 +68,7 @@ export function AutomationPage() {
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [runId]);
+  }, [runId, runState, showToast]);
 
   const toggleDevice = (deviceId: string) => {
     setSelectedDevices((prev) =>
@@ -66,6 +78,7 @@ export function AutomationPage() {
 
   const handleRun = async () => {
     if (!selectedTemplate || selectedDevices.length === 0) {
+      showToast('請選模板與至少一台裝置', 'error');
       return;
     }
     try {
@@ -74,10 +87,23 @@ export function AutomationPage() {
         duration_minutes: durationMinutes,
       });
       setRunId(status.run_id);
+      setRunState(status.state);
       setProgress(status.progress);
+      showToast('批次測試已開始', 'info');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Run failed');
     }
+  };
+
+  const handleStop = () => {
+    if (!runId) {
+      return;
+    }
+    if (isMockAutomationRun(runId)) {
+      mockStopAutomationRun(runId);
+    }
+    setRunState('stopped');
+    showToast('已停止批次測試', 'info');
   };
 
   return (
@@ -87,9 +113,21 @@ export function AutomationPage() {
           <h1>Test Automation</h1>
           <p>Run scripted tests across multiple set-top boxes.</p>
         </div>
-        <button type="button" className="btn btn--primary" onClick={() => void handleRun()}>
-          Run batch
-        </button>
+        <div className="toolbar">
+          <button type="button" className="btn btn--primary" onClick={() => void handleRun()}>
+            Run batch
+          </button>
+          {runId && runState === 'running' ? (
+            <button type="button" className="btn btn--danger" onClick={handleStop}>
+              Stop
+            </button>
+          ) : null}
+          {progress.length > 0 ? (
+            <button type="button" className="btn btn--ghost" onClick={() => setDetailOpen(true)}>
+              執行詳情
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {error && <p className="page-footer">{error}</p>}
@@ -162,22 +200,40 @@ export function AutomationPage() {
                 </tr>
               </thead>
               <tbody>
-                {progress.map((row, index) => (
-                  <tr key={`${row.device_label}-${index}`}>
-                    <td>{row.device_label}</td>
-                    <td>{row.step}</td>
-                    <td>
-                      <span className={`status-pill status-pill--${row.status.toLowerCase()}`}>
-                        {row.status}
-                      </span>
-                    </td>
+                {progress.length === 0 ? (
+                  <tr>
+                    <td colSpan={3}>按 Run batch 開始模擬進度</td>
                   </tr>
-                ))}
+                ) : (
+                  progress.map((row, index) => (
+                    <tr key={`${row.device_label}-${index}`}>
+                      <td>{row.device_label}</td>
+                      <td>{row.step}</td>
+                      <td>
+                        <span className={`status-pill status-pill--${row.status.toLowerCase()}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </section>
       </div>
+
+      <Drawer open={detailOpen} title="執行時間軸" onClose={() => setDetailOpen(false)}>
+        <ul className="timeline-list">
+          {progress.map((row, index) => (
+            <li key={`${row.device_label}-timeline-${index}`}>
+              <strong>{row.device_label}</strong>
+              <span>{row.step}</span>
+              <span className={`status-pill status-pill--${row.status.toLowerCase()}`}>{row.status}</span>
+            </li>
+          ))}
+        </ul>
+      </Drawer>
     </section>
   );
 }
