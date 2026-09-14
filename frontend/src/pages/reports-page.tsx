@@ -17,19 +17,21 @@ export function ReportsPage() {
   const [sliderValue, setSliderValue] = useState(50);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const result = await fetchReports();
-        setReports(result);
-        if (result[0]) {
-          setSelectedReportId(result[0].id);
-        }
-      } catch (requestError) {
-        setError(requestError instanceof Error ? requestError.message : '無法載入報表');
+  const loadReports = async () => {
+    setError('');
+    try {
+      const result = await fetchReports();
+      setReports(result);
+      if (result[0]) {
+        setSelectedReportId(result[0].id);
       }
-    };
-    void load();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : '無法載入報表');
+    }
+  };
+
+  useEffect(() => {
+    void loadReports();
   }, []);
 
   useEffect(() => {
@@ -86,6 +88,9 @@ export function ReportsPage() {
               截圖比對
             </button>
           </div>
+          <button type="button" className="btn btn--ghost" onClick={() => void loadReports()}>
+            重新整理
+          </button>
           <button type="button" className="btn btn--secondary" onClick={handleExport}>
             匯出報表
           </button>
@@ -111,7 +116,7 @@ export function ReportsPage() {
                 {reports.length === 0 ? (
                   <tr>
                     <td colSpan={5}>
-                      尚無測試紀錄。請在「自動化」頁執行批次測試；若剛跑完仍空白，代表上次可能是展示模式模擬，請重跑。
+                      尚無測試紀錄。請在「自動化」頁執行批次測試，或按「重新整理」。若 PowerShell 已有資料但這裡空白，請確認前端 dev server 已重啟且 Agent 在 8765 運行。
                     </td>
                   </tr>
                 ) : (

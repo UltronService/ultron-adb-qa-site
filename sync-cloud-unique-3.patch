@@ -1,0 +1,646 @@
+diff --git a/frontend/src/api/reports-api.ts b/frontend/src/api/reports-api.ts
+index 0eb4a2c..128ca91 100644
+--- a/frontend/src/api/reports-api.ts
++++ b/frontend/src/api/reports-api.ts
+@@ -3,10 +3,39 @@ import { agentRequest } from './agent-client';
+ import type { ReportDiff, ReportSummary } from '../types/api-types';
+ import type { MockReportDetail } from '../data/mock-reports';
+ 
++function isAgentUnreachable(error: unknown): boolean {
++  return error instanceof TypeError;
++}
++
++interface RunDetailResponse {
++  id: string;
++  template_name: string;
++  started_at: string;
++  summary: { pass_count: number; fail: number };
++  devices: Array<{
++    device_label: string;
++    status: string;
++    error: string | null;
++    steps: Array<{ name: string; status: string; detail?: string | null }>;
++  }>;
++}
++
++function formatReportDate(isoDate: string): string {
++  const parsed = new Date(isoDate);
++  if (Number.isNaN(parsed.getTime())) {
++    return isoDate;
++  }
++  return parsed.toISOString().slice(0, 16).replace('T', ' ');
++}
++
+ export async function fetchReports(): Promise<ReportSummary[]> {
+   try {
+-    return await agentRequest<ReportSummary[]>('/api/reports');
+-  } catch {
++    const result = await agentRequest<ReportSummary[]>('/api/reports');
++    return Array.isArray(result) ? result : [];
++  } catch (error) {
++    if (!isAgentUnreachable(error)) {
++      throw error;
++    }
+     return mockFetchReports();
+   }
+ }
+@@ -14,16 +43,38 @@ export async function fetchReports(): Promise<ReportSummary[]> {
+ export async function fetchReportDiff(reportId: string): Promise<ReportDiff> {
+   try {
+     return await agentRequest<ReportDiff>(`/api/reports/${reportId}/diff`);
+-  } catch {
++  } catch (error) {
++    if (!isAgentUnreachable(error)) {
++      throw error;
++    }
+     return mockFetchReportDiff(reportId);
+   }
+ }
+ 
+ export async function fetchReportDetail(reportId: string): Promise<MockReportDetail | null> {
+   try {
+-    await agentRequest<ReportSummary>(`/api/reports/${reportId}`);
+-    return mockFetchReportDetail(reportId);
+-  } catch {
++    const detail = await agentRequest<RunDetailResponse>(`/api/runs/${reportId}`);
++    return {
++      id: detail.id,
++      date: formatReportDate(detail.started_at),
++      template: detail.template_name,
++      pass_count: detail.summary.pass_count,
++      fail_count: detail.summary.fail,
++      devices: detail.devices.map((device) => ({
++        label: device.device_label,
++        status: device.status,
++        note:
++          device.error ||
++          device.steps
++            .map((step) => (step.detail ? `${step.name}: ${step.detail}` : step.name))
++            .join(' · ') ||
++          '',
++      })),
++    };
++  } catch (error) {
++    if (!isAgentUnreachable(error)) {
++      throw error;
++    }
+     return mockFetchReportDetail(reportId);
+   }
+ }
+diff --git a/frontend/src/pages/reports-page.tsx b/frontend/src/pages/reports-page.tsx
+index 47db0e8..063a1f7 100644
+--- a/frontend/src/pages/reports-page.tsx
++++ b/frontend/src/pages/reports-page.tsx
+@@ -17,19 +17,21 @@ export function ReportsPage() {
+   const [sliderValue, setSliderValue] = useState(50);
+   const [error, setError] = useState('');
+ 
+-  useEffect(() => {
+-    const load = async () => {
+-      try {
+-        const result = await fetchReports();
+-        setReports(result);
+-        if (result[0]) {
+-          setSelectedReportId(result[0].id);
+-        }
+-      } catch (requestError) {
+-        setError(requestError instanceof Error ? requestError.message : '無法載入報表');
++  const loadReports = async () => {
++    setError('');
++    try {
++      const result = await fetchReports();
++      setReports(result);
++      if (result[0]) {
++        setSelectedReportId(result[0].id);
+       }
+-    };
+-    void load();
++    } catch (requestError) {
++      setError(requestError instanceof Error ? requestError.message : '無法載入報表');
++    }
++  };
++
++  useEffect(() => {
++    void loadReports();
+   }, []);
+ 
+   useEffect(() => {
+@@ -86,6 +88,9 @@ export function ReportsPage() {
+               截圖比對
+             </button>
+           </div>
++          <button type="button" className="btn btn--ghost" onClick={() => void loadReports()}>
++            重新整理
++          </button>
+           <button type="button" className="btn btn--secondary" onClick={handleExport}>
+             匯出報表
+           </button>
+@@ -111,7 +116,7 @@ export function ReportsPage() {
+                 {reports.length === 0 ? (
+                   <tr>
+                     <td colSpan={5}>
+-                      尚無測試紀錄。請在「自動化」頁執行批次測試；若剛跑完仍空白，代表上次可能是展示模式模擬，請重跑。
++                      尚無測試紀錄。請在「自動化」頁執行批次測試，或按「重新整理」。若 PowerShell 已有資料但這裡空白，請確認前端 dev server 已重啟且 Agent 在 8765 運行。
+                     </td>
+                   </tr>
+                 ) : (
+diff --git a/frontend/vite.config.ts b/frontend/vite.config.ts
+index 4568c42..84ead76 100644
+--- a/frontend/vite.config.ts
++++ b/frontend/vite.config.ts
+@@ -3,18 +3,25 @@ import { defineConfig } from 'vite';
+ 
+ const githubPagesBase = process.env.VITE_BASE_PATH ?? '/';
+ 
++const agentProxy = {
++  '/agent-api': {
++    target: 'http://127.0.0.1:8765',
++    changeOrigin: true,
++    rewrite: (path: string) => path.replace(/^\/agent-api/, ''),
++  },
++};
++
+ export default defineConfig({
+   base: githubPagesBase,
+   plugins: [react()],
+   server: {
+     port: 43123,
+     host: true,
+-    proxy: {
+-      '/agent-api': {
+-        target: 'http://127.0.0.1:8765',
+-        changeOrigin: true,
+-        rewrite: (path) => path.replace(/^\/agent-api/, ''),
+-      },
+-    },
++    proxy: agentProxy,
++  },
++  preview: {
++    port: 43123,
++    host: true,
++    proxy: agentProxy,
+   },
+ });
+diff --git a/scripts/windows-auto-uat.ps1 b/scripts/windows-auto-uat.ps1
+new file mode 100644
+index 0000000..5f20fc3
+--- /dev/null
++++ b/scripts/windows-auto-uat.ps1
+@@ -0,0 +1,51 @@
++# One-click cold-start UAT via Agent API (Windows)
++# Usage: .\scripts\windows-auto-uat.ps1
++# Keep Agent running on :8765 before executing.
++
++$ErrorActionPreference = "Stop"
++$RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
++Set-Location $RepoRoot
++
++Write-Host "=== Ultron auto UAT (cold start) ===" -ForegroundColor Cyan
++
++try {
++    $health = Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 5
++    Write-Host "Agent OK: $($health.status)" -ForegroundColor Green
++} catch {
++    Write-Host "ERROR: Agent not running. Run .\scripts\windows-start-agent.ps1 first." -ForegroundColor Red
++    exit 1
++}
++
++$payload = @{
++    template_id = "cold-start"
++    device_ids  = @("192.168.1.176:5555", "192.168.1.148:5555")
++    params      = @{
++        package_name       = "com.ultron.player"
++        launch_activity    = "com.ultron.player/.MainActivity"
++        launch_time_max_ms = "5000"
++    }
++} | ConvertTo-Json -Depth 4 -Compress
++
++Write-Host "Starting cold-start on both STBs..." -ForegroundColor Yellow
++$run = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/automation/run" `
++    -Method POST -Body $payload -ContentType "application/json; charset=utf-8"
++
++Write-Host "Run ID: $($run.run_id)" -ForegroundColor Gray
++
++do {
++    Start-Sleep -Seconds 2
++    $status = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/automation/runs/$($run.run_id)"
++    Clear-Host
++    Write-Host "Run: $($run.run_id)  State: $($status.state)" -ForegroundColor Cyan
++    $status.progress | Format-Table device_label, step, status -AutoSize
++} while ($status.state -eq "running")
++
++Write-Host "`n=== Reports ===" -ForegroundColor Cyan
++$reports = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/reports"
++if ($reports.Count -eq 0) {
++    Write-Host "No reports yet. Check agent\data\runs\$($run.run_id)\logs" -ForegroundColor Yellow
++} else {
++    $reports | Format-Table id, date, template, pass_count, fail_count -AutoSize
++}
++
++Write-Host "`nDone. Open http://localhost:43124/reports in browser (start frontend if needed)." -ForegroundColor Green
+diff --git a/sync/patches/device-profile-fields.patch b/sync/patches/device-profile-fields.patch
+new file mode 100644
+index 0000000..84c68a2
+--- /dev/null
++++ b/sync/patches/device-profile-fields.patch
+@@ -0,0 +1,400 @@
++From 88138fa17c32a9b4c14fd1e7ad71d5fa2b95637f Mon Sep 17 00:00:00 2001
++From: Cursor Agent <cursoragent@cursor.com>
++Date: Mon, 14 Sep 2026 04:07:08 +0000
++Subject: [PATCH] feat(devices): show Ultron Player profile fields on device
++ cards
++
++Extend DeviceInfo with brand, branch, player device id, category,
++installed APK version, and last schedule sync date. Fetch values via
++adb run-as sqlite query and dumpsys package, and update the devices UI.
++
++Co-authored-by: admin <admin@ultron-ad.com>
++---
++ agent/models/schemas.py                 |   6 +
++ agent/services/adb_service.py           | 139 +++++++++++++++++++++++-
++ frontend/src/data/mock-devices.ts       |  24 ++++
++ frontend/src/lib/format-device-field.ts |  11 ++
++ frontend/src/lib/map-mock-device.ts     |   6 +
++ frontend/src/pages/devices-page.tsx     |  21 ++--
++ frontend/src/types/api-types.ts         |   6 +
++ 7 files changed, 204 insertions(+), 9 deletions(-)
++ create mode 100644 frontend/src/lib/format-device-field.ts
++
++diff --git a/agent/models/schemas.py b/agent/models/schemas.py
++index 259e46e..58477de 100644
++--- a/agent/models/schemas.py
+++++ b/agent/models/schemas.py
++@@ -11,6 +11,12 @@ class DeviceInfo(BaseModel):
++     cpu_percent: float = 0
++     ram_percent: float = 0
++     ping_ms: float = 0
+++    brand_name: str = ""
+++    branch_name: str = ""
+++    player_device_id: int | None = None
+++    category_name: str = ""
+++    installed_apk_version: str = ""
+++    last_schedule_sync_at: str = ""
++ 
++ 
++ class ConnectDeviceRequest(BaseModel):
++diff --git a/agent/services/adb_service.py b/agent/services/adb_service.py
++index b6e4e4e..9593e0e 100644
++--- a/agent/services/adb_service.py
+++++ b/agent/services/adb_service.py
++@@ -4,10 +4,18 @@ import shutil
++ import subprocess
++ import sys
++ from collections.abc import AsyncIterator
+++from dataclasses import asdict, dataclass
++ from datetime import datetime, timezone
++ 
++ from models.schemas import DeviceInfo
++ 
+++ULTRON_PLAYER_PACKAGE = "com.ultron.player"
+++ULTRON_DB_PATH = "databases/ultron_project"
+++ULTRON_LOGIN_SQL = (
+++    "SELECT brandName,branchName,categoryName,deviceId,lastGetScheduleDate "
+++    "FROM login LIMIT 1;"
+++)
+++
++ LOG_LEVEL_MAP = {
++     "Verbose": "V",
++     "Debug": "D",
++@@ -17,6 +25,16 @@ LOG_LEVEL_MAP = {
++ }
++ 
++ 
+++@dataclass(frozen=True)
+++class UltronPlayerProfile:
+++    brand_name: str = ""
+++    branch_name: str = ""
+++    player_device_id: int | None = None
+++    category_name: str = ""
+++    installed_apk_version: str = ""
+++    last_schedule_sync_at: str = ""
+++
+++
++ class AdbService:
++     """ADB command wrappers with mock fallback when adb is unavailable."""
++ 
++@@ -32,6 +50,12 @@ class AdbService:
++                 cpu_percent=23,
++                 ram_percent=61,
++                 ping_ms=4,
+++                brand_name="Demo Brand",
+++                branch_name="Demo Store 176",
+++                player_device_id=1001,
+++                category_name="大螢幕",
+++                installed_apk_version="v1.0.0(10053)",
+++                last_schedule_sync_at="2026-09-14",
++             ),
++             DeviceInfo(
++                 id="stb-148",
++@@ -43,6 +67,12 @@ class AdbService:
++                 cpu_percent=41,
++                 ram_percent=72,
++                 ping_ms=6,
+++                brand_name="Demo Brand",
+++                branch_name="Demo Store 148",
+++                player_device_id=1002,
+++                category_name="櫃台",
+++                installed_apk_version="v1.0.0(10053)",
+++                last_schedule_sync_at="2026-09-14",
++             ),
++         ]
++ 
++@@ -115,7 +145,11 @@ class AdbService:
++             )
++             devices.append(device)
++ 
++-        return devices or list(self._mock_devices)
+++        if devices:
+++            devices = await asyncio.gather(*[self._enrich_device(device) for device in devices])
+++            return list(devices)
+++
+++        return list(self._mock_devices)
++ 
++     async def connect(self, address: str) -> DeviceInfo:
++         normalized = address.strip()
++@@ -143,7 +177,7 @@ class AdbService:
++             if device.ip == normalized or device.id == normalized:
++                 return device
++ 
++-        return DeviceInfo(
+++        fallback = DeviceInfo(
++             id=normalized,
++             label=normalized,
++             ip=normalized,
++@@ -151,6 +185,7 @@ class AdbService:
++             model="Unknown",
++             android_version="-",
++         )
+++        return await self._enrich_device(fallback)
++ 
++     async def scan_lan(self) -> list[DeviceInfo]:
++         if not self.adb_available:
++@@ -352,6 +387,106 @@ class AdbService:
++         if return_code != 0:
++             raise RuntimeError(stderr or "Activity launch failed")
++ 
+++    async def _enrich_device(self, device: DeviceInfo) -> DeviceInfo:
+++        if not device.online or not self.adb_available:
+++            return device
+++
+++        try:
+++            profile = await self._fetch_ultron_player_profile(device.id)
+++        except (OSError, NotImplementedError, RuntimeError):
+++            return device
+++
+++        return device.model_copy(update=asdict(profile))
+++
+++    async def _fetch_ultron_player_profile(self, device_id: str) -> UltronPlayerProfile:
+++        login_task = self._fetch_ultron_login_row(device_id)
+++        apk_task = self._fetch_installed_apk_version(device_id)
+++        login_row, installed_apk_version = await asyncio.gather(login_task, apk_task)
+++
+++        if login_row is None:
+++            return UltronPlayerProfile(installed_apk_version=installed_apk_version)
+++
+++        brand_name, branch_name, category_name, player_device_id, last_schedule_sync_at = login_row
+++        return UltronPlayerProfile(
+++            brand_name=brand_name,
+++            branch_name=branch_name,
+++            player_device_id=player_device_id,
+++            category_name=category_name,
+++            installed_apk_version=installed_apk_version,
+++            last_schedule_sync_at=last_schedule_sync_at,
+++        )
+++
+++    async def _fetch_ultron_login_row(
+++        self,
+++        device_id: str,
+++    ) -> tuple[str, str, str, int | None, str] | None:
+++        try:
+++            return_code, stdout, _stderr = await self._run_adb(
+++                "-s",
+++                device_id,
+++                "shell",
+++                "run-as",
+++                ULTRON_PLAYER_PACKAGE,
+++                "sqlite3",
+++                "-separator",
+++                "|",
+++                ULTRON_DB_PATH,
+++                ULTRON_LOGIN_SQL,
+++            )
+++        except (OSError, NotImplementedError):
+++            return None
+++
+++        if return_code != 0:
+++            return None
+++
+++        line = stdout.strip().splitlines()[0] if stdout.strip() else ""
+++        if not line:
+++            return None
+++
+++        parts = line.split("|")
+++        if len(parts) < 5:
+++            return None
+++
+++        brand_name = parts[0].strip()
+++        branch_name = parts[1].strip()
+++        category_name = parts[2].strip()
+++        player_device_id = self._parse_optional_int(parts[3])
+++        last_schedule_sync_at = parts[4].strip()
+++        return brand_name, branch_name, category_name, player_device_id, last_schedule_sync_at
+++
+++    async def _fetch_installed_apk_version(self, device_id: str) -> str:
+++        try:
+++            return_code, stdout, _stderr = await self._run_adb(
+++                "-s",
+++                device_id,
+++                "shell",
+++                "dumpsys",
+++                "package",
+++                ULTRON_PLAYER_PACKAGE,
+++            )
+++        except (OSError, NotImplementedError):
+++            return ""
+++
+++        if return_code != 0:
+++            return ""
+++
+++        for line in stdout.splitlines():
+++            stripped = line.strip()
+++            if stripped.startswith("versionName="):
+++                return stripped.split("=", 1)[1].strip()
+++
+++        return ""
+++
+++    @staticmethod
+++    def _parse_optional_int(raw: str) -> int | None:
+++        normalized = raw.strip()
+++        if not normalized or normalized.lower() == "null":
+++            return None
+++        try:
+++            return int(normalized)
+++        except ValueError:
+++            return None
+++
++     @staticmethod
++     def _extract_field(line: str, prefix: str) -> str:
++         match = re.search(rf"{re.escape(prefix)}(\S+)", line)
++diff --git a/frontend/src/data/mock-devices.ts b/frontend/src/data/mock-devices.ts
++index c84b9f5..41828a3 100644
++--- a/frontend/src/data/mock-devices.ts
+++++ b/frontend/src/data/mock-devices.ts
++@@ -8,6 +8,12 @@ export interface MockDevice {
++   cpuPercent: number;
++   ramPercent: number;
++   pingMs: number;
+++  brandName: string;
+++  branchName: string;
+++  playerDeviceId: number | null;
+++  categoryName: string;
+++  installedApkVersion: string;
+++  lastScheduleSyncAt: string;
++ }
++ 
++ export const MOCK_DEVICES: MockDevice[] = [
++@@ -21,6 +27,12 @@ export const MOCK_DEVICES: MockDevice[] = [
++     cpuPercent: 28,
++     ramPercent: 58,
++     pingMs: 3,
+++    brandName: 'Demo Brand',
+++    branchName: '台北信義店',
+++    playerDeviceId: 1001,
+++    categoryName: '大螢幕',
+++    installedApkVersion: 'v1.0.0(10053)',
+++    lastScheduleSyncAt: '2026-09-14',
++   },
++   {
++     id: 'stb-148',
++@@ -32,6 +44,12 @@ export const MOCK_DEVICES: MockDevice[] = [
++     cpuPercent: 35,
++     ramPercent: 64,
++     pingMs: 5,
+++    brandName: 'Demo Brand',
+++    branchName: '台中逢甲店',
+++    playerDeviceId: 1002,
+++    categoryName: '櫃台',
+++    installedApkVersion: 'v1.0.0(10053)',
+++    lastScheduleSyncAt: '2026-09-14',
++   },
++   {
++     id: 'stb-spare',
++@@ -43,5 +61,11 @@ export const MOCK_DEVICES: MockDevice[] = [
++     cpuPercent: 0,
++     ramPercent: 0,
++     pingMs: 0,
+++    brandName: '',
+++    branchName: '',
+++    playerDeviceId: null,
+++    categoryName: '',
+++    installedApkVersion: '',
+++    lastScheduleSyncAt: '',
++   },
++ ];
++diff --git a/frontend/src/lib/format-device-field.ts b/frontend/src/lib/format-device-field.ts
++new file mode 100644
++index 0000000..d9735ff
++--- /dev/null
+++++ b/frontend/src/lib/format-device-field.ts
++@@ -0,0 +1,11 @@
+++export function formatDeviceField(value: string | number | null | undefined): string {
+++  if (value === null || value === undefined) {
+++    return '-';
+++  }
+++
+++  if (typeof value === 'string' && value.trim().length === 0) {
+++    return '-';
+++  }
+++
+++  return String(value);
+++}
++diff --git a/frontend/src/lib/map-mock-device.ts b/frontend/src/lib/map-mock-device.ts
++index 1f2c9b8..bbf3d31 100644
++--- a/frontend/src/lib/map-mock-device.ts
+++++ b/frontend/src/lib/map-mock-device.ts
++@@ -12,6 +12,12 @@ export function mapMockDeviceToApi(device: (typeof MOCK_DEVICES)[number]): Devic
++     cpu_percent: device.cpuPercent,
++     ram_percent: device.ramPercent,
++     ping_ms: device.pingMs,
+++    brand_name: device.brandName,
+++    branch_name: device.branchName,
+++    player_device_id: device.playerDeviceId,
+++    category_name: device.categoryName,
+++    installed_apk_version: device.installedApkVersion,
+++    last_schedule_sync_at: device.lastScheduleSyncAt,
++   };
++ }
++ 
++diff --git a/frontend/src/pages/devices-page.tsx b/frontend/src/pages/devices-page.tsx
++index 9c79458..bd96bb0 100644
++--- a/frontend/src/pages/devices-page.tsx
+++++ b/frontend/src/pages/devices-page.tsx
++@@ -4,6 +4,7 @@ import { Drawer } from '../components/ui/drawer';
++ import { Skeleton } from '../components/ui/skeleton';
++ import { useDemoMode } from '../hooks/use-demo-mode';
++ import { useToast } from '../hooks/use-toast';
+++import { formatDeviceField } from '../lib/format-device-field';
++ import type { DeviceInfo } from '../types/api-types';
++ 
++ export function DevicesPage() {
++@@ -134,10 +135,12 @@ export function DevicesPage() {
++             <dl className="meta-list">
++               <div><dt>IP</dt><dd>{device.ip}</dd></div>
++               <div><dt>型號</dt><dd>{device.model}</dd></div>
++-              <div><dt>Android</dt><dd>{device.android_version}</dd></div>
++-              <div><dt>CPU</dt><dd>{device.online ? `${device.cpu_percent}%` : '-'}</dd></div>
++-              <div><dt>記憶體</dt><dd>{device.online ? `${device.ram_percent}%` : '-'}</dd></div>
++-              <div><dt>延遲</dt><dd>{device.online ? `${device.ping_ms} ms` : '-'}</dd></div>
+++              <div><dt>品牌</dt><dd>{formatDeviceField(device.brand_name)}</dd></div>
+++              <div><dt>店家</dt><dd>{formatDeviceField(device.branch_name)}</dd></div>
+++              <div><dt>Device ID</dt><dd>{formatDeviceField(device.player_device_id)}</dd></div>
+++              <div><dt>類別</dt><dd>{formatDeviceField(device.category_name)}</dd></div>
+++              <div><dt>APK 版號</dt><dd>{formatDeviceField(device.installed_apk_version)}</dd></div>
+++              <div><dt>排程同步</dt><dd>{formatDeviceField(device.last_schedule_sync_at)}</dd></div>
++             </dl>
++             <div className="device-card__actions">
++               <button
++@@ -163,12 +166,16 @@ export function DevicesPage() {
++         {detailDevice ? (
++           <>
++             <dl className="meta-list meta-list--stacked">
++-              <div><dt>裝置 ID</dt><dd><code>{detailDevice.id}</code></dd></div>
+++              <div><dt>ADB 序號</dt><dd><code>{detailDevice.id}</code></dd></div>
++               <div><dt>IP</dt><dd>{detailDevice.ip}</dd></div>
++               <div><dt>型號</dt><dd>{detailDevice.model}</dd></div>
++-              <div><dt>Android</dt><dd>{detailDevice.android_version}</dd></div>
+++              <div><dt>品牌</dt><dd>{formatDeviceField(detailDevice.brand_name)}</dd></div>
+++              <div><dt>店家</dt><dd>{formatDeviceField(detailDevice.branch_name)}</dd></div>
+++              <div><dt>Device ID</dt><dd>{formatDeviceField(detailDevice.player_device_id)}</dd></div>
+++              <div><dt>類別</dt><dd>{formatDeviceField(detailDevice.category_name)}</dd></div>
+++              <div><dt>APK 版號</dt><dd>{formatDeviceField(detailDevice.installed_apk_version)}</dd></div>
+++              <div><dt>排程同步</dt><dd>{formatDeviceField(detailDevice.last_schedule_sync_at)}</dd></div>
++               <div><dt>狀態</dt><dd>{detailDevice.online ? '線上' : '離線'}</dd></div>
++-              <div><dt>最後連線</dt><dd>{isDemoMode ? '剛剛（展示模式）' : '—'}</dd></div>
++             </dl>
++             <p className="page-footer">點選卡片可查看規格；勾選後可用上方批次操作列。</p>
++           </>
++diff --git a/frontend/src/types/api-types.ts b/frontend/src/types/api-types.ts
++index d8102f5..5038982 100644
++--- a/frontend/src/types/api-types.ts
+++++ b/frontend/src/types/api-types.ts
++@@ -8,6 +8,12 @@ export interface DeviceInfo {
++   cpu_percent: number;
++   ram_percent: number;
++   ping_ms: number;
+++  brand_name?: string;
+++  branch_name?: string;
+++  player_device_id?: number | null;
+++  category_name?: string;
+++  installed_apk_version?: string;
+++  last_schedule_sync_at?: string;
++ }
++ 
++ export interface ApkInfo {
++-- 
++2.43.0
++
