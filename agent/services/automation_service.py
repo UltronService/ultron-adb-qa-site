@@ -257,13 +257,31 @@ class AutomationService:
         params: AutomationParams,
         progress_row: AutomationProgressRow,
     ) -> StoredDeviceResult:
-        script_command = _resolve_script_command(template_id)
         sanitized = sanitize_serial(device_id)
         log_path = run_dir / "logs" / f"{sanitized}.txt"
         screenshot_path = run_dir / "screenshots" / f"{sanitized}.png"
-        device_label = await self._resolve_device_label(device_id)
+
+        try:
+            device_label = await self._resolve_device_label(device_id)
+        except Exception as error:
+            device_label = device_id
+            error_text = str(error) or error.__class__.__name__
+            progress_row.device_label = device_label
+            progress_row.step = error_text
+            progress_row.status = "Fail"
+            log_path.write_text(error_text, encoding="utf-8")
+            return StoredDeviceResult(
+                device_id=device_id,
+                device_label=device_label,
+                status=DeviceStatus.FAIL.value,
+                steps=[],
+                log_path=f"logs/{sanitized}.txt",
+                error=error_text,
+            )
+
         progress_row.device_label = device_label
         progress_row.step = "Running script"
+        script_command = _resolve_script_command(template_id)
 
         env = os.environ.copy()
         env["ADB_SERIAL"] = device_id
@@ -314,8 +332,12 @@ class AutomationService:
 
         steps = self._parse_steps_from_log(template_id, log_content, passed)
         status = DeviceStatus.PASS if passed else DeviceStatus.FAIL
-        progress_row.step = self._latest_step_label(steps, error_message)
-        progress_row.status = "Pass" if passed else "Fail"
+        if passed:
+            progress_row.step = self._latest_step_label(steps, error_message)
+            progress_row.status = "Pass"
+        else:
+            progress_row.step = error_message or self._latest_step_label(steps, error_message) or "Script failed"
+            progress_row.status = "Fail"
 
         return StoredDeviceResult(
             device_id=device_id,
