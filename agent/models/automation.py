@@ -28,9 +28,10 @@ class StepStatus(str, Enum):
 
 class AutomationParams(BaseModel):
     package_name: str | None = None
+    launch_activity: str | None = None
     monkey_events: int = Field(default=500, ge=1, le=100_000)
     duration_minutes: int = Field(default=30, ge=1, le=720)
-    launch_time_max_ms: int = Field(default=3000, ge=100, le=60_000)
+    launch_time_max_ms: int = Field(default=5000, ge=100, le=60_000)
 
 
 class RunRequest(BaseModel):

@@ -33,6 +33,8 @@ export async function startAutomationRun(
         params: {
           ...params,
           package_name: params.package_name ?? ULTRON_PLAYER_APK_SOURCE.packageName,
+          launch_activity: params.launch_activity ?? ULTRON_PLAYER_APK_SOURCE.launchActivity,
+          launch_time_max_ms: params.launch_time_max_ms ?? '5000',
         },
       }),
     });

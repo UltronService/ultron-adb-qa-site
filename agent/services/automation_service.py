@@ -112,9 +112,10 @@ class AutomationService:
         template_enum = TemplateId(template_id)
         automation_params = AutomationParams(
             package_name=params.get("package_name") or None,
+            launch_activity=params.get("launch_activity") or None,
             monkey_events=int(params.get("monkey_events", "500")),
             duration_minutes=int(params.get("duration_minutes", "30")),
-            launch_time_max_ms=int(params.get("launch_time_max_ms", "3000")),
+            launch_time_max_ms=int(params.get("launch_time_max_ms", "5000")),
         )
         if template_enum != TemplateId.REBOOT_NET and not automation_params.package_name:
             raise ValueError("params.package_name is required for this template.")
@@ -128,6 +129,13 @@ class AutomationService:
     ) -> AutomationRunStatus:
         if not device_ids:
             raise ValueError("At least one device is required")
+
+        mock_ids = [device_id for device_id in device_ids if device_id.startswith("stb-")]
+        if mock_ids:
+            raise ValueError(
+                f"Mock device ids cannot run automation: {', '.join(mock_ids)}. "
+                "Refresh the devices page and use ADB serials like 192.168.1.176:5555."
+            )
 
         template = next((item for item in self.TEMPLATES if item.id == template_id), None)
         if template is None:
@@ -260,6 +268,9 @@ class AutomationService:
         env = os.environ.copy()
         env["ADB_SERIAL"] = device_id
         env["PACKAGE_NAME"] = params.package_name or ""
+        package_name = params.package_name or "com.ultron.player"
+        launch_activity = params.launch_activity or f"{package_name}/.MainActivity"
+        env["LAUNCH_ACTIVITY"] = launch_activity
         env["MONKEY_EVENTS"] = str(params.monkey_events)
         env["DURATION_MINUTES"] = str(params.duration_minutes)
         env["LAUNCH_TIME_MAX_MS"] = str(params.launch_time_max_ms)
@@ -342,12 +353,24 @@ class AutomationService:
                     row.step = str(error)
                     row.status = "Fail"
             job.state = "completed"
+            self._save_run_meta(job, template_id, params, started_at, stored_results)
             return
 
+        self._save_run_meta(job, template_id, params, started_at, stored_results)
+        job.state = "completed"
+
+    def _save_run_meta(
+        self,
+        job: AutomationJob,
+        template_id: TemplateId,
+        params: AutomationParams,
+        started_at: str,
+        stored_results: list[StoredDeviceResult],
+    ) -> None:
         pass_count = sum(1 for result in stored_results if result.status == DeviceStatus.PASS.value)
         fail_count = len(stored_results) - pass_count
         finished_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
+        run_dir = create_run_dir(job.run_id)
         meta = {
             "id": job.run_id,
             "template_id": template_id.value,
@@ -359,4 +382,3 @@ class AutomationService:
             "devices": [result.model_dump(mode="json") for result in stored_results],
         }
         save_meta(run_dir, meta)
-        job.state = "completed"
