@@ -213,6 +213,21 @@ class AutomationService:
 
     async def _capture_screenshot(self, device_id: str, screenshot_path: Path) -> None:
         try:
+            if sys.platform == "win32":
+                def _sync_capture() -> bytes | None:
+                    completed = subprocess.run(
+                        ["adb", "-s", device_id, "exec-out", "screencap", "-p"],
+                        capture_output=True,
+                    )
+                    if completed.returncode == 0 and completed.stdout:
+                        return completed.stdout
+                    return None
+
+                stdout_bytes = await asyncio.to_thread(_sync_capture)
+                if stdout_bytes:
+                    screenshot_path.write_bytes(stdout_bytes)
+                return
+
             process = await asyncio.create_subprocess_exec(
                 "adb",
                 "-s",
@@ -226,7 +241,7 @@ class AutomationService:
             stdout_bytes, _ = await process.communicate()
             if process.returncode == 0 and stdout_bytes:
                 screenshot_path.write_bytes(stdout_bytes)
-        except OSError:
+        except (OSError, NotImplementedError, RuntimeError):
             return
 
     def _parse_steps_from_log(self, template_id: TemplateId, log_content: str, passed: bool) -> list[RunStep]:

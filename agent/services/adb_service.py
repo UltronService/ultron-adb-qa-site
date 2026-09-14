@@ -1,6 +1,8 @@
 import asyncio
 import re
 import shutil
+import subprocess
+import sys
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
@@ -57,6 +59,20 @@ class AdbService:
     async def _run_adb_bytes(self, *args: str) -> tuple[int, bytes, bytes]:
         if not self.adb_available:
             return 1, b"", b"adb not found"
+
+        if sys.platform == "win32":
+            def _sync_run() -> tuple[int, bytes, bytes]:
+                completed = subprocess.run(
+                    ["adb", *args],
+                    capture_output=True,
+                )
+                return (
+                    completed.returncode or 0,
+                    completed.stdout or b"",
+                    completed.stderr or b"",
+                )
+
+            return await asyncio.to_thread(_sync_run)
 
         process = await asyncio.create_subprocess_exec(
             "adb",
