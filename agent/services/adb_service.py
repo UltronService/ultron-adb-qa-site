@@ -4,9 +4,18 @@ import shutil
 import subprocess
 import sys
 from collections.abc import AsyncIterator
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
 from models.schemas import DeviceInfo
+
+ULTRON_PLAYER_PACKAGE = "com.ultron.player"
+ULTRON_DB_PATH = "databases/ultron_project"
+ULTRON_LOGIN_SQL = (
+    "SELECT brandName, branchName, categoryName, deviceId, lastGetScheduleDate "
+    "FROM login LIMIT 1;"
+)
+ADB_SHELL_TIMEOUT_SEC = 8.0
 
 LOG_LEVEL_MAP = {
     "Verbose": "V",
@@ -15,6 +24,16 @@ LOG_LEVEL_MAP = {
     "Warn": "W",
     "Error": "E",
 }
+
+
+@dataclass(frozen=True)
+class UltronPlayerProfile:
+    brand_name: str = ""
+    branch_name: str = ""
+    player_device_id: int | None = None
+    category_name: str = ""
+    installed_apk_version: str = ""
+    last_schedule_sync_at: str = ""
 
 
 class AdbService:
@@ -32,6 +51,12 @@ class AdbService:
                 cpu_percent=23,
                 ram_percent=61,
                 ping_ms=4,
+                brand_name="Demo Brand",
+                branch_name="Demo Store 176",
+                player_device_id=1001,
+                category_name="大螢幕",
+                installed_apk_version="v1.0.0(10053)",
+                last_schedule_sync_at="2026-09-14",
             ),
             DeviceInfo(
                 id="stb-148",
@@ -43,6 +68,12 @@ class AdbService:
                 cpu_percent=41,
                 ram_percent=72,
                 ping_ms=6,
+                brand_name="Demo Brand",
+                branch_name="Demo Store 148",
+                player_device_id=1002,
+                category_name="櫃台",
+                installed_apk_version="v1.0.0(10053)",
+                last_schedule_sync_at="2026-09-14",
             ),
         ]
 
@@ -50,22 +81,38 @@ class AdbService:
     def adb_available(self) -> bool:
         return shutil.which("adb") is not None
 
-    async def _run_adb(self, *args: str) -> tuple[int, str, str]:
-        return_code, stdout_bytes, stderr_bytes = await self._run_adb_bytes(*args)
+    async def _run_adb(
+        self,
+        *args: str,
+        timeout_sec: float | None = None,
+    ) -> tuple[int, str, str]:
+        return_code, stdout_bytes, stderr_bytes = await self._run_adb_bytes(
+            *args,
+            timeout_sec=timeout_sec,
+        )
         stdout = stdout_bytes.decode("utf-8", errors="replace")
         stderr = stderr_bytes.decode("utf-8", errors="replace")
         return return_code, stdout, stderr
 
-    async def _run_adb_bytes(self, *args: str) -> tuple[int, bytes, bytes]:
+    async def _run_adb_bytes(
+        self,
+        *args: str,
+        timeout_sec: float | None = None,
+    ) -> tuple[int, bytes, bytes]:
         if not self.adb_available:
             return 1, b"", b"adb not found"
 
         if sys.platform == "win32":
             def _sync_run() -> tuple[int, bytes, bytes]:
-                completed = subprocess.run(
-                    ["adb", *args],
-                    capture_output=True,
-                )
+                try:
+                    completed = subprocess.run(
+                        ["adb", *args],
+                        capture_output=True,
+                        timeout=timeout_sec,
+                    )
+                except subprocess.TimeoutExpired:
+                    return 124, b"", b"adb command timed out"
+
                 return (
                     completed.returncode or 0,
                     completed.stdout or b"",
@@ -80,7 +127,20 @@ class AdbService:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout_bytes, stderr_bytes = await process.communicate()
+        try:
+            if timeout_sec is None:
+                stdout_bytes, stderr_bytes = await process.communicate()
+            else:
+                stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                    process.communicate(),
+                    timeout=timeout_sec,
+                )
+        except asyncio.TimeoutError:
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+            return 124, b"", b"adb command timed out"
+
         return process.returncode or 0, stdout_bytes, stderr_bytes
 
     async def list_devices(self) -> list[DeviceInfo]:
@@ -115,7 +175,11 @@ class AdbService:
             )
             devices.append(device)
 
-        return devices or list(self._mock_devices)
+        if devices:
+            devices = await asyncio.gather(*[self._enrich_device(device) for device in devices])
+            return list(devices)
+
+        return list(self._mock_devices)
 
     async def connect(self, address: str) -> DeviceInfo:
         normalized = address.strip()
@@ -143,7 +207,7 @@ class AdbService:
             if device.ip == normalized or device.id == normalized:
                 return device
 
-        return DeviceInfo(
+        fallback = DeviceInfo(
             id=normalized,
             label=normalized,
             ip=normalized,
@@ -151,6 +215,7 @@ class AdbService:
             model="Unknown",
             android_version="-",
         )
+        return await self._enrich_device(fallback)
 
     async def scan_lan(self) -> list[DeviceInfo]:
         if not self.adb_available:
@@ -351,6 +416,107 @@ class AdbService:
         )
         if return_code != 0:
             raise RuntimeError(stderr or "Activity launch failed")
+
+    async def _enrich_device(self, device: DeviceInfo) -> DeviceInfo:
+        if not device.online or not self.adb_available:
+            return device
+
+        try:
+            profile = await self._fetch_ultron_player_profile(device.id)
+        except (OSError, NotImplementedError, RuntimeError):
+            return device
+
+        return device.model_copy(update=asdict(profile))
+
+    async def _fetch_ultron_player_profile(self, device_id: str) -> UltronPlayerProfile:
+        login_task = self._fetch_ultron_login_row(device_id)
+        apk_task = self._fetch_installed_apk_version(device_id)
+        login_row, installed_apk_version = await asyncio.gather(login_task, apk_task)
+
+        if login_row is None:
+            return UltronPlayerProfile(installed_apk_version=installed_apk_version)
+
+        brand_name, branch_name, category_name, player_device_id, last_schedule_sync_at = login_row
+        return UltronPlayerProfile(
+            brand_name=brand_name,
+            branch_name=branch_name,
+            player_device_id=player_device_id,
+            category_name=category_name,
+            installed_apk_version=installed_apk_version,
+            last_schedule_sync_at=last_schedule_sync_at,
+        )
+
+    async def _fetch_ultron_login_row(
+        self,
+        device_id: str,
+    ) -> tuple[str, str, str, int | None, str] | None:
+        # Single adb shell string keeps the SQL quoted on the STB (Windows-safe).
+        shell_command = (
+            f"run-as {ULTRON_PLAYER_PACKAGE} sqlite3 {ULTRON_DB_PATH} "
+            f"\"{ULTRON_LOGIN_SQL.strip()}\""
+        )
+        try:
+            return_code, stdout, _stderr = await self._run_adb(
+                "-s",
+                device_id,
+                "shell",
+                shell_command,
+                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+            )
+        except (OSError, NotImplementedError):
+            return None
+
+        if return_code != 0:
+            return None
+
+        line = stdout.strip().splitlines()[0] if stdout.strip() else ""
+        if not line:
+            return None
+
+        parts = line.split("|")
+        if len(parts) < 5:
+            return None
+
+        brand_name = parts[0].strip()
+        branch_name = parts[1].strip()
+        category_name = parts[2].strip()
+        player_device_id = self._parse_optional_int(parts[3])
+        last_schedule_sync_at = parts[4].strip()
+        return brand_name, branch_name, category_name, player_device_id, last_schedule_sync_at
+
+    async def _fetch_installed_apk_version(self, device_id: str) -> str:
+        try:
+            return_code, stdout, _stderr = await self._run_adb(
+                "-s",
+                device_id,
+                "shell",
+                "dumpsys",
+                "package",
+                ULTRON_PLAYER_PACKAGE,
+                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+            )
+        except (OSError, NotImplementedError):
+            return ""
+
+        if return_code != 0:
+            return ""
+
+        for line in stdout.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("versionName="):
+                return stripped.split("=", 1)[1].strip()
+
+        return ""
+
+    @staticmethod
+    def _parse_optional_int(raw: str) -> int | None:
+        normalized = raw.strip()
+        if not normalized or normalized.lower() == "null":
+            return None
+        try:
+            return int(normalized)
+        except ValueError:
+            return None
 
     @staticmethod
     def _extract_field(line: str, prefix: str) -> str:

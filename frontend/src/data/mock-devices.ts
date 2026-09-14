@@ -8,6 +8,12 @@ export interface MockDevice {
   cpuPercent: number;
   ramPercent: number;
   pingMs: number;
+  brandName: string;
+  branchName: string;
+  playerDeviceId: number | null;
+  categoryName: string;
+  installedApkVersion: string;
+  lastScheduleSyncAt: string;
 }
 
 export const MOCK_DEVICES: MockDevice[] = [
@@ -21,6 +27,12 @@ export const MOCK_DEVICES: MockDevice[] = [
     cpuPercent: 28,
     ramPercent: 58,
     pingMs: 3,
+    brandName: 'Demo Brand',
+    branchName: '台北信義店',
+    playerDeviceId: 1001,
+    categoryName: '大螢幕',
+    installedApkVersion: 'v1.0.0(10053)',
+    lastScheduleSyncAt: '2026-09-14',
   },
   {
     id: 'stb-148',
@@ -32,6 +44,12 @@ export const MOCK_DEVICES: MockDevice[] = [
     cpuPercent: 35,
     ramPercent: 64,
     pingMs: 5,
+    brandName: 'Demo Brand',
+    branchName: '台中逢甲店',
+    playerDeviceId: 1002,
+    categoryName: '櫃台',
+    installedApkVersion: 'v1.0.0(10053)',
+    lastScheduleSyncAt: '2026-09-14',
   },
   {
     id: 'stb-spare',
@@ -43,5 +61,11 @@ export const MOCK_DEVICES: MockDevice[] = [
     cpuPercent: 0,
     ramPercent: 0,
     pingMs: 0,
+    brandName: '',
+    branchName: '',
+    playerDeviceId: null,
+    categoryName: '',
+    installedApkVersion: '',
+    lastScheduleSyncAt: '',
   },
 ];

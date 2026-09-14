@@ -11,6 +11,12 @@ class DeviceInfo(BaseModel):
     cpu_percent: float = 0
     ram_percent: float = 0
     ping_ms: float = 0
+    brand_name: str = ""
+    branch_name: str = ""
+    player_device_id: int | None = None
+    category_name: str = ""
+    installed_apk_version: str = ""
+    last_schedule_sync_at: str = ""
 
 
 class ConnectDeviceRequest(BaseModel):

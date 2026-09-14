@@ -8,6 +8,12 @@ export interface DeviceInfo {
   cpu_percent: number;
   ram_percent: number;
   ping_ms: number;
+  brand_name?: string;
+  branch_name?: string;
+  player_device_id?: number | null;
+  category_name?: string;
+  installed_apk_version?: string;
+  last_schedule_sync_at?: string;
 }
 
 export interface ApkInfo {

@@ -4,6 +4,7 @@ import { Drawer } from '../components/ui/drawer';
 import { Skeleton } from '../components/ui/skeleton';
 import { useDemoMode } from '../hooks/use-demo-mode';
 import { useToast } from '../hooks/use-toast';
+import { formatDeviceField } from '../lib/format-device-field';
 import type { DeviceInfo } from '../types/api-types';
 
 export function DevicesPage() {
@@ -134,10 +135,12 @@ export function DevicesPage() {
             <dl className="meta-list">
               <div><dt>IP</dt><dd>{device.ip}</dd></div>
               <div><dt>型號</dt><dd>{device.model}</dd></div>
-              <div><dt>Android</dt><dd>{device.android_version}</dd></div>
-              <div><dt>CPU</dt><dd>{device.online ? `${device.cpu_percent}%` : '-'}</dd></div>
-              <div><dt>記憶體</dt><dd>{device.online ? `${device.ram_percent}%` : '-'}</dd></div>
-              <div><dt>延遲</dt><dd>{device.online ? `${device.ping_ms} ms` : '-'}</dd></div>
+              <div><dt>品牌</dt><dd>{formatDeviceField(device.brand_name)}</dd></div>
+              <div><dt>店家</dt><dd>{formatDeviceField(device.branch_name)}</dd></div>
+              <div><dt>Device ID</dt><dd>{formatDeviceField(device.player_device_id)}</dd></div>
+              <div><dt>類別</dt><dd>{formatDeviceField(device.category_name)}</dd></div>
+              <div><dt>APK 版號</dt><dd>{formatDeviceField(device.installed_apk_version)}</dd></div>
+              <div><dt>排程同步</dt><dd>{formatDeviceField(device.last_schedule_sync_at)}</dd></div>
             </dl>
             <div className="device-card__actions">
               <button
@@ -163,12 +166,16 @@ export function DevicesPage() {
         {detailDevice ? (
           <>
             <dl className="meta-list meta-list--stacked">
-              <div><dt>裝置 ID</dt><dd><code>{detailDevice.id}</code></dd></div>
+              <div><dt>ADB 序號</dt><dd><code>{detailDevice.id}</code></dd></div>
               <div><dt>IP</dt><dd>{detailDevice.ip}</dd></div>
               <div><dt>型號</dt><dd>{detailDevice.model}</dd></div>
-              <div><dt>Android</dt><dd>{detailDevice.android_version}</dd></div>
+              <div><dt>品牌</dt><dd>{formatDeviceField(detailDevice.brand_name)}</dd></div>
+              <div><dt>店家</dt><dd>{formatDeviceField(detailDevice.branch_name)}</dd></div>
+              <div><dt>Device ID</dt><dd>{formatDeviceField(detailDevice.player_device_id)}</dd></div>
+              <div><dt>類別</dt><dd>{formatDeviceField(detailDevice.category_name)}</dd></div>
+              <div><dt>APK 版號</dt><dd>{formatDeviceField(detailDevice.installed_apk_version)}</dd></div>
+              <div><dt>排程同步</dt><dd>{formatDeviceField(detailDevice.last_schedule_sync_at)}</dd></div>
               <div><dt>狀態</dt><dd>{detailDevice.online ? '線上' : '離線'}</dd></div>
-              <div><dt>最後連線</dt><dd>{isDemoMode ? '剛剛（展示模式）' : '—'}</dd></div>
             </dl>
             <p className="page-footer">點選卡片可查看規格；勾選後可用上方批次操作列。</p>
           </>
