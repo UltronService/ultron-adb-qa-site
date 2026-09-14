@@ -1,3 +1,4 @@
+import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
 import {
   mockFetchAutomationRunStatus,
   mockFetchAutomationTemplates,
@@ -5,6 +6,10 @@ import {
 } from '../lib/mock-api';
 import { agentRequest } from './agent-client';
 import type { AutomationRunStatus, AutomationTemplate } from '../types/api-types';
+
+function isAgentUnreachable(error: unknown): boolean {
+  return error instanceof TypeError;
+}
 
 export async function fetchAutomationTemplates(): Promise<AutomationTemplate[]> {
   try {
@@ -25,10 +30,16 @@ export async function startAutomationRun(
       body: JSON.stringify({
         template_id: templateId,
         device_ids: deviceIds,
-        params,
+        params: {
+          ...params,
+          package_name: params.package_name ?? ULTRON_PLAYER_APK_SOURCE.packageName,
+        },
       }),
     });
-  } catch {
+  } catch (error) {
+    if (!isAgentUnreachable(error)) {
+      throw error;
+    }
     return mockStartAutomationRun(templateId, deviceIds);
   }
 }

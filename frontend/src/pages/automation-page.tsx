@@ -92,7 +92,9 @@ export function AutomationPage() {
       setProgress(status.progress);
       showToast('批次測試已開始', 'info');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : '執行失敗');
+      const message = requestError instanceof Error ? requestError.message : '執行失敗';
+      setError(message);
+      showToast(message, 'error');
     }
   };
 

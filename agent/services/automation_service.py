@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import shutil
+import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -39,6 +40,27 @@ _TEMPLATE_SCRIPT: Final[dict[TemplateId, str]] = {
 }
 
 _LAUNCH_TIME_PATTERN: Final[re.Pattern[str]] = re.compile(r"launch_time_ms=(\d+)")
+
+
+def _resolve_script_command(template_id: TemplateId) -> list[str]:
+    script_name = _TEMPLATE_SCRIPT[template_id]
+    script_stem = script_name.removesuffix(".sh")
+    script_dir = _SCRIPTS_DIR
+
+    if sys.platform == "win32":
+        ps1_path = script_dir / f"{script_stem}.ps1"
+        if ps1_path.is_file():
+            return [
+                "powershell",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(ps1_path),
+            ]
+
+    sh_path = script_dir / script_name
+    return ["bash", str(sh_path)]
 
 
 @dataclass
@@ -227,8 +249,7 @@ class AutomationService:
         params: AutomationParams,
         progress_row: AutomationProgressRow,
     ) -> StoredDeviceResult:
-        script_name = _TEMPLATE_SCRIPT[template_id]
-        script_path = _SCRIPTS_DIR / script_name
+        script_command = _resolve_script_command(template_id)
         sanitized = sanitize_serial(device_id)
         log_path = run_dir / "logs" / f"{sanitized}.txt"
         screenshot_path = run_dir / "screenshots" / f"{sanitized}.png"
@@ -250,8 +271,7 @@ class AutomationService:
 
         try:
             process = await asyncio.create_subprocess_exec(
-                "bash",
-                str(script_path),
+                *script_command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,

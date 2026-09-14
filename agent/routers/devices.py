@@ -11,7 +11,7 @@ adb_service = AdbService()
 async def get_devices() -> list[DeviceInfo]:
     try:
         return await adb_service.list_devices()
-    except RuntimeError as error:
+    except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 
 

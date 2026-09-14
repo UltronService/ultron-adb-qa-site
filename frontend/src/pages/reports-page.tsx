@@ -108,29 +108,37 @@ export function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {reports.map((run) => (
-                  <tr key={run.id}>
-                    <td>{run.date}</td>
-                    <td>{run.template}</td>
-                    <td>{run.pass_count}</td>
-                    <td>{run.fail_count}</td>
-                    <td>
-                      <button type="button" className="btn btn--ghost" onClick={() => void openDetail(run.id)}>
-                        詳情
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--ghost"
-                        onClick={() => {
-                          setSelectedReportId(run.id);
-                          setActiveTab('diff');
-                        }}
-                      >
-                        查看比對
-                      </button>
+                {reports.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>
+                      尚無測試紀錄。請在「自動化」頁執行批次測試；若剛跑完仍空白，代表上次可能是展示模式模擬，請重跑。
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  reports.map((run) => (
+                    <tr key={run.id}>
+                      <td>{run.date}</td>
+                      <td>{run.template}</td>
+                      <td>{run.pass_count}</td>
+                      <td>{run.fail_count}</td>
+                      <td>
+                        <button type="button" className="btn btn--ghost" onClick={() => void openDetail(run.id)}>
+                          詳情
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--ghost"
+                          onClick={() => {
+                            setSelectedReportId(run.id);
+                            setActiveTab('diff');
+                          }}
+                        >
+                          查看比對
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

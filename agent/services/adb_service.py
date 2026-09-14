@@ -71,7 +71,11 @@ class AdbService:
         if not self.adb_available:
             return list(self._mock_devices)
 
-        return_code, stdout, _stderr = await self._run_adb("devices", "-l")
+        try:
+            return_code, stdout, _stderr = await self._run_adb("devices", "-l")
+        except (OSError, NotImplementedError) as error:
+            return list(self._mock_devices)
+
         if return_code != 0:
             return list(self._mock_devices)
 
