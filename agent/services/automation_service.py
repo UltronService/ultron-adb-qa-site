@@ -359,8 +359,19 @@ class AutomationService:
         run_dir = create_run_dir(job.run_id)
         stored_results: list[StoredDeviceResult] = []
 
-        try:
-            for device_id, progress_row in zip(job.device_ids, job.progress, strict=True):
+        if len(job.device_ids) != len(job.progress):
+            mismatch_error = (
+                f"Device/progress length mismatch: {len(job.device_ids)} vs {len(job.progress)}"
+            )
+            for row in job.progress:
+                row.step = mismatch_error
+                row.status = "Fail"
+            job.state = "completed"
+            self._save_run_meta(job, template_id, params, started_at, stored_results)
+            return
+
+        for device_id, progress_row in zip(job.device_ids, job.progress, strict=False):
+            try:
                 result = await self._run_script_for_device(
                     run_dir,
                     template_id,
@@ -369,14 +380,23 @@ class AutomationService:
                     progress_row,
                 )
                 stored_results.append(result)
-        except Exception as error:
-            for row in job.progress:
-                if row.status == "Running":
-                    row.step = str(error)
-                    row.status = "Fail"
-            job.state = "completed"
-            self._save_run_meta(job, template_id, params, started_at, stored_results)
-            return
+            except Exception as error:
+                error_text = str(error) or error.__class__.__name__
+                progress_row.step = error_text
+                progress_row.status = "Fail"
+                sanitized = sanitize_serial(device_id)
+                log_path = run_dir / "logs" / f"{sanitized}.txt"
+                log_path.write_text(error_text, encoding="utf-8")
+                stored_results.append(
+                    StoredDeviceResult(
+                        device_id=device_id,
+                        device_label=progress_row.device_label or device_id,
+                        status=DeviceStatus.FAIL.value,
+                        steps=[],
+                        log_path=f"logs/{sanitized}.txt",
+                        error=error_text,
+                    )
+                )
 
         self._save_run_meta(job, template_id, params, started_at, stored_results)
         job.state = "completed"
