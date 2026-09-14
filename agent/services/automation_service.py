@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -40,6 +41,25 @@ _TEMPLATE_SCRIPT: Final[dict[TemplateId, str]] = {
 }
 
 _LAUNCH_TIME_PATTERN: Final[re.Pattern[str]] = re.compile(r"launch_time_ms=(\d+)")
+
+
+async def _run_subprocess_command(
+    cmd: list[str],
+    env: dict[str, str],
+    cwd: str,
+) -> tuple[int, str, str]:
+    def _sync_run() -> tuple[int, str, str]:
+        completed = subprocess.run(
+            cmd,
+            env=env,
+            cwd=cwd,
+            capture_output=True,
+        )
+        stdout = completed.stdout.decode(errors="replace") if completed.stdout else ""
+        stderr = completed.stderr.decode(errors="replace") if completed.stderr else ""
+        return completed.returncode, stdout, stderr
+
+    return await asyncio.to_thread(_sync_run)
 
 
 def _resolve_script_command(template_id: TemplateId) -> list[str]:
@@ -299,28 +319,37 @@ class AutomationService:
         log_content = ""
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *script_command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=env,
-                cwd=str(_SCRIPTS_DIR),
-            )
-            stdout_bytes, stderr_bytes = await process.communicate()
-            stdout = stdout_bytes.decode(errors="replace")
-            stderr = stderr_bytes.decode(errors="replace")
+            if sys.platform == "win32":
+                return_code, stdout, stderr = await _run_subprocess_command(
+                    script_command,
+                    env,
+                    str(_SCRIPTS_DIR),
+                )
+            else:
+                process = await asyncio.create_subprocess_exec(
+                    *script_command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
+                    cwd=str(_SCRIPTS_DIR),
+                )
+                stdout_bytes, stderr_bytes = await process.communicate()
+                stdout = stdout_bytes.decode(errors="replace")
+                stderr = stderr_bytes.decode(errors="replace")
+                return_code = process.returncode or 0
 
             if log_path.is_file():
                 log_content = log_path.read_text(encoding="utf-8", errors="replace")
             else:
                 log_content = f"{stdout}\n{stderr}".strip()
-                log_path.write_text(log_content, encoding="utf-8")
+                if log_content:
+                    log_path.write_text(log_content, encoding="utf-8")
 
-            passed = process.returncode == 0
+            passed = return_code == 0
             if not passed:
-                error_message = stderr or stdout or f"Script exited with code {process.returncode}"
-        except OSError as error:
-            error_message = str(error)
+                error_message = stderr or stdout or f"Script exited with code {return_code}"
+        except (OSError, NotImplementedError, RuntimeError) as error:
+            error_message = str(error) or error.__class__.__name__
             log_path.write_text(error_message, encoding="utf-8")
             log_content = error_message
         else:
