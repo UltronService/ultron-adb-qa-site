@@ -16,21 +16,22 @@ $durationMinutes = if ($env:DURATION_MINUTES) { [int]$env:DURATION_MINUTES } els
 $intervalSeconds = 30
 $totalSeconds = $durationMinutes * 60
 $elapsed = 0
-$adb = @("adb", "-s", $env:ADB_SERIAL)
+$adbExe = if ($env:ADB_EXE) { $env:ADB_EXE } else { "adb" }
+$serial = $env:ADB_SERIAL
 
 Write-Log "long-playback: launch $env:PACKAGE_NAME"
-& $adb shell monkey -p $env:PACKAGE_NAME -c android.intent.category.LAUNCHER 1 2>&1 | Out-Null
-& $adb logcat -c 2>&1 | Out-Null
+& $adbExe -s $serial shell monkey -p $env:PACKAGE_NAME -c android.intent.category.LAUNCHER 1 2>&1 | Out-Null
+& $adbExe -s $serial logcat -c 2>&1 | Out-Null
 
 Write-Log "long-playback: monitor for $durationMinutes minutes"
 while ($elapsed -lt $totalSeconds) {
-    $pidOut = & $adb shell pidof $env:PACKAGE_NAME 2>&1
+    $pidOut = & $adbExe -s $serial shell pidof $env:PACKAGE_NAME 2>&1
     if (-not $pidOut -or ($pidOut | Out-String).Trim().Length -eq 0) {
         Write-Log "long-playback: FAIL — process not running after ${elapsed}s"
         exit 1
     }
 
-    $logSnippet = & $adb logcat -d -t 50 2>&1
+    $logSnippet = & $adbExe -s $serial logcat -d -t 50 2>&1
     $logText = ($logSnippet | Out-String)
     if ($logText -match 'AndroidRuntime:\s*FATAL|ANR in') {
         if ($env:RUN_LOG_PATH) { Add-Content -Path $env:RUN_LOG_PATH -Value $logText }

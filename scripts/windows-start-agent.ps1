@@ -17,6 +17,7 @@ function Add-PathIfExists {
 @(
     "$env:LOCALAPPDATA\Android\Sdk\platform-tools",
     "$env:USERPROFILE\AppData\Local\Android\Sdk\platform-tools",
+    "C:\adb\platform-tools",
     "C:\platform-tools",
     "C:\Program Files\Git\bin",
     "C:\Program Files\Git\usr\bin"
@@ -35,7 +36,7 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 }
 
 if (-not (Get-Command adb -ErrorAction SilentlyContinue)) {
-    Write-Host "WARN: adb not in PATH — /api/devices may use mock IDs." -ForegroundColor Yellow
+    Write-Host "WARN: adb not in PATH - /api/devices may use mock IDs." -ForegroundColor Yellow
 } else {
     Write-Host "OK: adb = $(Get-Command adb | Select-Object -ExpandProperty Source)" -ForegroundColor Green
 }

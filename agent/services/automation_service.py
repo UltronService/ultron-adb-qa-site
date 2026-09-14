@@ -43,6 +43,27 @@ _TEMPLATE_SCRIPT: Final[dict[TemplateId, str]] = {
 _LAUNCH_TIME_PATTERN: Final[re.Pattern[str]] = re.compile(r"launch_time_ms=(\d+)")
 
 
+def _inject_adb_env(env: dict[str, str]) -> dict[str, str]:
+    adb_path = shutil.which("adb", path=env.get("PATH"))
+    if adb_path is None:
+        for candidate in (
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Android" / "Sdk" / "platform-tools" / "adb.exe",
+            Path("C:/adb/platform-tools/adb.exe"),
+            Path("C:/platform-tools/adb.exe"),
+        ):
+            if candidate.is_file():
+                adb_path = str(candidate)
+                break
+
+    if adb_path is None:
+        return env
+
+    adb_dir = str(Path(adb_path).parent)
+    env["PATH"] = f"{adb_dir}{os.pathsep}{env.get('PATH', '')}"
+    env["ADB_EXE"] = adb_path
+    return env
+
+
 async def _run_subprocess_command(
     cmd: list[str],
     env: dict[str, str],
@@ -318,7 +339,7 @@ class AutomationService:
         progress_row.step = "Running script"
         script_command = _resolve_script_command(template_id)
 
-        env = os.environ.copy()
+        env = _inject_adb_env(os.environ.copy())
         env["ADB_SERIAL"] = device_id
         env["PACKAGE_NAME"] = params.package_name or ""
         package_name = params.package_name or "com.ultron.player"

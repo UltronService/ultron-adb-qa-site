@@ -13,18 +13,19 @@ if (-not $env:ADB_SERIAL) { throw "ADB_SERIAL is required" }
 if (-not $env:PACKAGE_NAME) { throw "PACKAGE_NAME is required" }
 
 $launchMax = if ($env:LAUNCH_TIME_MAX_MS) { [int]$env:LAUNCH_TIME_MAX_MS } else { 5000 }
-$adb = @("adb", "-s", $env:ADB_SERIAL)
+$adbExe = if ($env:ADB_EXE) { $env:ADB_EXE } else { "adb" }
+$serial = $env:ADB_SERIAL
 
 Write-Log "cold-start: check package $($env:PACKAGE_NAME)"
-$pkgPath = (& $adb shell pm path $env:PACKAGE_NAME 2>&1 | Out-String).Trim()
+$pkgPath = (& $adbExe -s $serial shell pm path $env:PACKAGE_NAME 2>&1 | Out-String).Trim()
 if (-not $pkgPath -or $pkgPath -match 'error|not found') {
-    Write-Log "cold-start: FAIL package not installed on $($env:ADB_SERIAL)"
+    Write-Log "cold-start: FAIL package not installed on $serial"
     exit 1
 }
 
 $launchActivity = $env:LAUNCH_ACTIVITY
 if (-not $launchActivity) {
-    $resolved = (& $adb shell cmd package resolve-activity --brief $env:PACKAGE_NAME 2>&1 | Out-String).Trim()
+    $resolved = (& $adbExe -s $serial shell cmd package resolve-activity --brief $env:PACKAGE_NAME 2>&1 | Out-String).Trim()
     $lines = $resolved -split "`n" | Where-Object { $_.Trim().Length -gt 0 }
     if ($lines.Count -ge 2) {
         $launchActivity = $lines[-1].Trim()
@@ -35,10 +36,10 @@ if (-not $launchActivity) {
 
 Write-Log "cold-start: using component $launchActivity"
 Write-Log "cold-start: force-stop $($env:PACKAGE_NAME)"
-& $adb shell am force-stop $env:PACKAGE_NAME 2>&1 | Out-Null
+& $adbExe -s $serial shell am force-stop $env:PACKAGE_NAME 2>&1 | Out-Null
 
 Write-Log "cold-start: launch"
-$startOutput = & $adb shell am start -W -n $launchActivity 2>&1
+$startOutput = & $adbExe -s $serial shell am start -W -n $launchActivity 2>&1
 $startText = ($startOutput | Out-String).Trim()
 if ($env:RUN_LOG_PATH) { Add-Content -Path $env:RUN_LOG_PATH -Value $startText }
 
