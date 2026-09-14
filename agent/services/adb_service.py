@@ -27,6 +27,13 @@ LOG_LEVEL_MAP = {
 
 
 @dataclass(frozen=True)
+class HardwareGetpropProfile:
+    product_brand: str = ""
+    product_manufacturer: str = ""
+    product_model: str = ""
+
+
+@dataclass(frozen=True)
 class UltronPlayerProfile:
     brand_name: str = ""
     branch_name: str = ""
@@ -51,6 +58,9 @@ class AdbService:
                 cpu_percent=23,
                 ram_percent=61,
                 ping_ms=4,
+                product_brand="AOC",
+                product_manufacturer="TAISHAN",
+                product_model="Hi3751V560",
                 brand_name="Demo Brand",
                 branch_name="Demo Store 176",
                 player_device_id=1001,
@@ -68,6 +78,9 @@ class AdbService:
                 cpu_percent=41,
                 ram_percent=72,
                 ping_ms=6,
+                product_brand="AOC",
+                product_manufacturer="TAISHAN",
+                product_model="taishan",
                 brand_name="Demo Brand",
                 branch_name="Demo Store 148",
                 player_device_id=1002,
@@ -422,11 +435,48 @@ class AdbService:
             return device
 
         try:
-            profile = await self._fetch_ultron_player_profile(device.id)
+            ultron_profile, hardware_profile = await asyncio.gather(
+                self._fetch_ultron_player_profile(device.id),
+                self._fetch_hardware_getprop(device.id),
+            )
         except (OSError, NotImplementedError, RuntimeError):
             return device
 
-        return device.model_copy(update=asdict(profile))
+        return device.model_copy(
+            update={**asdict(ultron_profile), **asdict(hardware_profile)},
+        )
+
+    async def _fetch_hardware_getprop(self, device_id: str) -> HardwareGetpropProfile:
+        props = (
+            ("product_brand", "ro.product.brand"),
+            ("product_manufacturer", "ro.product.manufacturer"),
+            ("product_model", "ro.product.model"),
+        )
+        tasks = [self._fetch_getprop_value(device_id, prop_key) for _, prop_key in props]
+        values = await asyncio.gather(*tasks)
+        return HardwareGetpropProfile(
+            product_brand=values[0],
+            product_manufacturer=values[1],
+            product_model=values[2],
+        )
+
+    async def _fetch_getprop_value(self, device_id: str, prop_key: str) -> str:
+        try:
+            return_code, stdout, _stderr = await self._run_adb(
+                "-s",
+                device_id,
+                "shell",
+                "getprop",
+                prop_key,
+                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+            )
+        except (OSError, NotImplementedError):
+            return ""
+
+        if return_code != 0:
+            return ""
+
+        return stdout.strip()
 
     async def _fetch_ultron_player_profile(self, device_id: str) -> UltronPlayerProfile:
         login_task = self._fetch_ultron_login_row(device_id)

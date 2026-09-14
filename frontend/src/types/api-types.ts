@@ -8,6 +8,9 @@ export interface DeviceInfo {
   cpu_percent: number;
   ram_percent: number;
   ping_ms: number;
+  product_brand?: string;
+  product_manufacturer?: string;
+  product_model?: string;
   brand_name?: string;
   branch_name?: string;
   player_device_id?: number | null;

@@ -135,6 +135,9 @@ export function DevicesPage() {
             <dl className="meta-list">
               <div><dt>IP</dt><dd>{device.ip}</dd></div>
               <div><dt>型號</dt><dd>{device.model}</dd></div>
+              <div><dt>硬體品牌</dt><dd>{formatDeviceField(device.product_brand)}</dd></div>
+              <div><dt>製造商</dt><dd>{formatDeviceField(device.product_manufacturer)}</dd></div>
+              <div><dt>硬體型號</dt><dd>{formatDeviceField(device.product_model)}</dd></div>
               <div><dt>品牌</dt><dd>{formatDeviceField(device.brand_name)}</dd></div>
               <div><dt>店家</dt><dd>{formatDeviceField(device.branch_name)}</dd></div>
               <div><dt>Device ID</dt><dd>{formatDeviceField(device.player_device_id)}</dd></div>
@@ -169,6 +172,9 @@ export function DevicesPage() {
               <div><dt>ADB 序號</dt><dd><code>{detailDevice.id}</code></dd></div>
               <div><dt>IP</dt><dd>{detailDevice.ip}</dd></div>
               <div><dt>型號</dt><dd>{detailDevice.model}</dd></div>
+              <div><dt>硬體品牌</dt><dd>{formatDeviceField(detailDevice.product_brand)}</dd></div>
+              <div><dt>製造商</dt><dd>{formatDeviceField(detailDevice.product_manufacturer)}</dd></div>
+              <div><dt>硬體型號</dt><dd>{formatDeviceField(detailDevice.product_model)}</dd></div>
               <div><dt>品牌</dt><dd>{formatDeviceField(detailDevice.brand_name)}</dd></div>
               <div><dt>店家</dt><dd>{formatDeviceField(detailDevice.branch_name)}</dd></div>
               <div><dt>Device ID</dt><dd>{formatDeviceField(detailDevice.player_device_id)}</dd></div>
