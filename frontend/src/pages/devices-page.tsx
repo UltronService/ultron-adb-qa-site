@@ -20,28 +20,19 @@ function DeviceMetaSections({ device, variant }: DeviceMetaSectionsProps) {
       <div className="device-fields-section">
         <h4 className="device-fields-section__title">系統</h4>
         <dl className={metaListClassName}>
-          {variant === 'detail' ? (
-            <div><dt>ADB 序號</dt><dd><code>{device.id}</code></dd></div>
-          ) : null}
-          <div><dt>IP</dt><dd>{device.ip}</dd></div>
-          <div><dt>型號</dt><dd>{device.model}</dd></div>
-          <div><dt>硬體品牌</dt><dd>{formatDeviceField(device.product_brand)}</dd></div>
-          <div><dt>製造商</dt><dd>{formatDeviceField(device.product_manufacturer)}</dd></div>
-          <div><dt>硬體型號</dt><dd>{formatDeviceField(device.product_model)}</dd></div>
-          {variant === 'detail' ? (
-            <div><dt>狀態</dt><dd>{device.online ? '線上' : '離線'}</dd></div>
-          ) : null}
+          <div><dt>品牌</dt><dd>{formatDeviceField(device.brand_name)}</dd></div>
+          <div><dt>店家</dt><dd>{formatDeviceField(device.branch_name)}</dd></div>
+          <div><dt>DeviceID</dt><dd>{formatDeviceField(device.player_device_id)}</dd></div>
+          <div><dt>VersionCode</dt><dd>{formatDeviceField(device.version_code)}</dd></div>
         </dl>
       </div>
       <div className="device-fields-section">
-        <h4 className="device-fields-section__title">播放器</h4>
+        <h4 className="device-fields-section__title">硬體</h4>
         <dl className={metaListClassName}>
-          <div><dt>品牌</dt><dd>{formatDeviceField(device.brand_name)}</dd></div>
-          <div><dt>店家</dt><dd>{formatDeviceField(device.branch_name)}</dd></div>
-          <div><dt>Device ID</dt><dd>{formatDeviceField(device.player_device_id)}</dd></div>
-          <div><dt>類別</dt><dd>{formatDeviceField(device.category_name)}</dd></div>
-          <div><dt>APK 版號</dt><dd>{formatDeviceField(device.installed_apk_version)}</dd></div>
-          <div><dt>排程同步</dt><dd>{formatDeviceField(device.last_schedule_sync_at)}</dd></div>
+          <div><dt>硬體品牌</dt><dd>{formatDeviceField(device.product_brand)}</dd></div>
+          <div><dt>Set-UP Box</dt><dd>{formatDeviceField(device.setup_box)}</dd></div>
+          <div><dt>Local IP</dt><dd>{device.ip}</dd></div>
+          <div><dt>Public IP</dt><dd>{formatDeviceField(device.public_ip)}</dd></div>
         </dl>
       </div>
     </>

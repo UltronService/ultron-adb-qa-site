@@ -20,6 +20,9 @@ class DeviceInfo(BaseModel):
     category_name: str = ""
     installed_apk_version: str = ""
     last_schedule_sync_at: str = ""
+    setup_box: str = ""
+    public_ip: str = ""
+    version_code: str = ""
 
 
 class ConnectDeviceRequest(BaseModel):
