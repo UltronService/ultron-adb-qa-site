@@ -7,6 +7,47 @@ import { useToast } from '../hooks/use-toast';
 import { formatDeviceField } from '../lib/format-device-field';
 import type { DeviceInfo } from '../types/api-types';
 
+interface DeviceMetaSectionsProps {
+  device: DeviceInfo;
+  variant: 'card' | 'detail';
+}
+
+function DeviceMetaSections({ device, variant }: DeviceMetaSectionsProps) {
+  const metaListClassName = variant === 'detail' ? 'meta-list meta-list--stacked' : 'meta-list';
+
+  return (
+    <>
+      <div className="device-fields-section">
+        <h4 className="device-fields-section__title">系統</h4>
+        <dl className={metaListClassName}>
+          {variant === 'detail' ? (
+            <div><dt>ADB 序號</dt><dd><code>{device.id}</code></dd></div>
+          ) : null}
+          <div><dt>IP</dt><dd>{device.ip}</dd></div>
+          <div><dt>型號</dt><dd>{device.model}</dd></div>
+          <div><dt>硬體品牌</dt><dd>{formatDeviceField(device.product_brand)}</dd></div>
+          <div><dt>製造商</dt><dd>{formatDeviceField(device.product_manufacturer)}</dd></div>
+          <div><dt>硬體型號</dt><dd>{formatDeviceField(device.product_model)}</dd></div>
+          {variant === 'detail' ? (
+            <div><dt>狀態</dt><dd>{device.online ? '線上' : '離線'}</dd></div>
+          ) : null}
+        </dl>
+      </div>
+      <div className="device-fields-section">
+        <h4 className="device-fields-section__title">播放器</h4>
+        <dl className={metaListClassName}>
+          <div><dt>品牌</dt><dd>{formatDeviceField(device.brand_name)}</dd></div>
+          <div><dt>店家</dt><dd>{formatDeviceField(device.branch_name)}</dd></div>
+          <div><dt>Device ID</dt><dd>{formatDeviceField(device.player_device_id)}</dd></div>
+          <div><dt>類別</dt><dd>{formatDeviceField(device.category_name)}</dd></div>
+          <div><dt>APK 版號</dt><dd>{formatDeviceField(device.installed_apk_version)}</dd></div>
+          <div><dt>排程同步</dt><dd>{formatDeviceField(device.last_schedule_sync_at)}</dd></div>
+        </dl>
+      </div>
+    </>
+  );
+}
+
 export function DevicesPage() {
   const { isDemoMode } = useDemoMode();
   const { showToast } = useToast();
@@ -132,19 +173,7 @@ export function DevicesPage() {
               </label>
               <span className="badge">{device.online ? '線上' : '離線'}</span>
             </div>
-            <dl className="meta-list">
-              <div><dt>IP</dt><dd>{device.ip}</dd></div>
-              <div><dt>型號</dt><dd>{device.model}</dd></div>
-              <div><dt>硬體品牌</dt><dd>{formatDeviceField(device.product_brand)}</dd></div>
-              <div><dt>製造商</dt><dd>{formatDeviceField(device.product_manufacturer)}</dd></div>
-              <div><dt>硬體型號</dt><dd>{formatDeviceField(device.product_model)}</dd></div>
-              <div><dt>品牌</dt><dd>{formatDeviceField(device.brand_name)}</dd></div>
-              <div><dt>店家</dt><dd>{formatDeviceField(device.branch_name)}</dd></div>
-              <div><dt>Device ID</dt><dd>{formatDeviceField(device.player_device_id)}</dd></div>
-              <div><dt>類別</dt><dd>{formatDeviceField(device.category_name)}</dd></div>
-              <div><dt>APK 版號</dt><dd>{formatDeviceField(device.installed_apk_version)}</dd></div>
-              <div><dt>排程同步</dt><dd>{formatDeviceField(device.last_schedule_sync_at)}</dd></div>
-            </dl>
+            <DeviceMetaSections device={device} variant="card" />
             <div className="device-card__actions">
               <button
                 type="button"
@@ -168,21 +197,7 @@ export function DevicesPage() {
       >
         {detailDevice ? (
           <>
-            <dl className="meta-list meta-list--stacked">
-              <div><dt>ADB 序號</dt><dd><code>{detailDevice.id}</code></dd></div>
-              <div><dt>IP</dt><dd>{detailDevice.ip}</dd></div>
-              <div><dt>型號</dt><dd>{detailDevice.model}</dd></div>
-              <div><dt>硬體品牌</dt><dd>{formatDeviceField(detailDevice.product_brand)}</dd></div>
-              <div><dt>製造商</dt><dd>{formatDeviceField(detailDevice.product_manufacturer)}</dd></div>
-              <div><dt>硬體型號</dt><dd>{formatDeviceField(detailDevice.product_model)}</dd></div>
-              <div><dt>品牌</dt><dd>{formatDeviceField(detailDevice.brand_name)}</dd></div>
-              <div><dt>店家</dt><dd>{formatDeviceField(detailDevice.branch_name)}</dd></div>
-              <div><dt>Device ID</dt><dd>{formatDeviceField(detailDevice.player_device_id)}</dd></div>
-              <div><dt>類別</dt><dd>{formatDeviceField(detailDevice.category_name)}</dd></div>
-              <div><dt>APK 版號</dt><dd>{formatDeviceField(detailDevice.installed_apk_version)}</dd></div>
-              <div><dt>排程同步</dt><dd>{formatDeviceField(detailDevice.last_schedule_sync_at)}</dd></div>
-              <div><dt>狀態</dt><dd>{detailDevice.online ? '線上' : '離線'}</dd></div>
-            </dl>
+            <DeviceMetaSections device={detailDevice} variant="detail" />
             <p className="page-footer">點選卡片可查看規格；勾選後可用上方批次操作列。</p>
           </>
         ) : null}
