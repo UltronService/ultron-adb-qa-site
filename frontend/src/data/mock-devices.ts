@@ -8,6 +8,9 @@ export interface MockDevice {
   cpuPercent: number;
   ramPercent: number;
   pingMs: number;
+  productBrand: string;
+  productManufacturer: string;
+  productModel: string;
   brandName: string;
   branchName: string;
   playerDeviceId: number | null;
@@ -27,6 +30,9 @@ export const MOCK_DEVICES: MockDevice[] = [
     cpuPercent: 28,
     ramPercent: 58,
     pingMs: 3,
+    productBrand: 'AOC',
+    productManufacturer: 'TAISHAN',
+    productModel: 'Hi3751V560',
     brandName: 'Demo Brand',
     branchName: '台北信義店',
     playerDeviceId: 1001,
@@ -44,6 +50,9 @@ export const MOCK_DEVICES: MockDevice[] = [
     cpuPercent: 35,
     ramPercent: 64,
     pingMs: 5,
+    productBrand: 'AOC',
+    productManufacturer: 'TAISHAN',
+    productModel: 'taishan',
     brandName: 'Demo Brand',
     branchName: '台中逢甲店',
     playerDeviceId: 1002,
@@ -61,6 +70,9 @@ export const MOCK_DEVICES: MockDevice[] = [
     cpuPercent: 0,
     ramPercent: 0,
     pingMs: 0,
+    productBrand: '',
+    productManufacturer: '',
+    productModel: '',
     brandName: '',
     branchName: '',
     playerDeviceId: null,

@@ -11,6 +11,9 @@ class DeviceInfo(BaseModel):
     cpu_percent: float = 0
     ram_percent: float = 0
     ping_ms: float = 0
+    product_brand: str = ""
+    product_manufacturer: str = ""
+    product_model: str = ""
     brand_name: str = ""
     branch_name: str = ""
     player_device_id: int | None = None
