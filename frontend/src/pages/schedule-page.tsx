@@ -2,14 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { fetchDevices } from '../api/device-api';
 import { fetchScheduleMedia } from '../api/schedule-api';
+import { ScheduleGantt } from '../components/schedule-gantt';
+import { SchedulePlaylistStrip } from '../components/schedule-playlist-strip';
 import { Skeleton } from '../components/ui/skeleton';
 import { useDemoMode } from '../hooks/use-demo-mode';
-import {
-  formatDateRange,
-  formatDayOfWeeks,
-  formatMediaType,
-  formatTimeRange,
-} from '../lib/format-schedule';
 import type { DeviceInfo, ScheduleMediaResponse } from '../types/api-types';
 
 export function SchedulePage() {
@@ -173,85 +169,12 @@ export function SchedulePage() {
                 <p className="schedule-mock-note">目前為展示模式資料（Agent 離線或裝置無法讀取時使用）。</p>
               ) : null}
 
-              {scheduleData.today_schedule ? (
-                <section className="panel schedule-today">
-                  <h3>今日排程</h3>
-                  <p>
-                    日期 {scheduleData.today_schedule.date}，專案 ID：
-                    {scheduleData.today_schedule.project_ids.length > 0
-                      ? scheduleData.today_schedule.project_ids.join('、')
-                      : '（無）'}
-                  </p>
-                </section>
-              ) : null}
+              <ScheduleGantt
+                projects={scheduleData.projects}
+                todaySchedule={scheduleData.today_schedule}
+              />
 
-              <section className="panel">
-                <h2>專案時段</h2>
-                {scheduleData.projects.length === 0 ? (
-                  <p className="schedule-empty">此裝置尚無專案時段資料。</p>
-                ) : (
-                  <div className="schedule-table-wrap">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>版面</th>
-                          <th>起迄日期</th>
-                          <th>起迄時間</th>
-                          <th>星期</th>
-                          <th>插播</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {scheduleData.projects.map((project) => (
-                          <tr key={project.id}>
-                            <td>{project.id}</td>
-                            <td>{project.layout_id ?? '—'}</td>
-                            <td>{formatDateRange(project.start_date, project.end_date)}</td>
-                            <td>{formatTimeRange(project.start_time, project.end_time)}</td>
-                            <td>{formatDayOfWeeks(project.day_of_weeks)}</td>
-                            <td>{project.is_interrupt ? '是' : '否'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
-
-              <section className="panel">
-                <h2>素材清單</h2>
-                {scheduleData.media.length === 0 ? (
-                  <p className="schedule-empty">此裝置尚無素材資料。</p>
-                ) : (
-                  <div className="schedule-table-wrap">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>名稱</th>
-                          <th>類型</th>
-                          <th>播放秒數</th>
-                          <th>起迄日期</th>
-                          <th>檔名</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {scheduleData.media.map((mediaItem) => (
-                          <tr key={mediaItem.id}>
-                            <td>{mediaItem.id}</td>
-                            <td>{mediaItem.name || '—'}</td>
-                            <td>{formatMediaType(mediaItem.type)}</td>
-                            <td>{mediaItem.duration_sec}</td>
-                            <td>{formatDateRange(mediaItem.start_date, mediaItem.end_date)}</td>
-                            <td className="schedule-file-cell">{mediaItem.file_name || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </section>
+              <SchedulePlaylistStrip media={scheduleData.media} />
             </>
           ) : null}
         </>

@@ -465,3 +465,97 @@ a { color: inherit; text-decoration: none; }
 .schedule-error { color: #ef9a9a; border-color: #5d2f2f; }
 .schedule-mock-note { margin: 0; color: #ffb74d; font-size: 0.88rem; }
 .schedule-today p { margin: 0; color: #c5d0e0; }
+
+/* ── Schedule Gantt ── */
+.schedule-gantt__header { margin-bottom: 0.75rem; }
+.schedule-gantt__header h2 { margin: 0 0 0.25rem; }
+.schedule-gantt__subtitle { margin: 0; color: #a8b3c5; font-size: 0.88rem; }
+
+.schedule-gantt__chart { position: relative; overflow-x: auto; }
+.schedule-gantt__axis {
+  position: relative; height: 1.5rem; margin-left: 7.5rem;
+  border-bottom: 1px solid #334155;
+}
+.schedule-gantt__tick {
+  position: absolute; top: 0; height: 100%;
+  border-left: 1px solid #2a3545;
+}
+.schedule-gantt__tick-label {
+  position: absolute; top: 0; left: 2px;
+  font-size: 0.7rem; color: #6b7a8d; white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.schedule-gantt__rows { position: relative; display: flex; flex-direction: column; gap: 0.35rem; padding-top: 0.5rem; }
+.schedule-gantt__row { display: flex; align-items: center; gap: 0.5rem; min-height: 2rem; }
+.schedule-gantt__label {
+  flex: 0 0 7rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem;
+  font-size: 0.82rem; color: #c5d0e0;
+}
+.schedule-gantt__label-id { font-weight: 600; }
+.schedule-gantt__label-layout { color: #90caf9; font-size: 0.78rem; }
+.schedule-gantt__interrupt-badge {
+  background: #5d4037; color: #ffcc80; font-size: 0.68rem;
+  padding: 0.05rem 0.35rem; border-radius: 999px;
+}
+
+.schedule-gantt__track {
+  flex: 1; position: relative; height: 1.6rem;
+  background: #1a2230; border-radius: 0.35rem; min-width: 480px;
+}
+.schedule-gantt__bar {
+  position: absolute; top: 0.15rem; height: calc(100% - 0.3rem);
+  background: linear-gradient(135deg, #3d5afe, #536dfe);
+  border-radius: 0.3rem; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; cursor: default; min-width: 2px;
+  transition: filter 0.15s;
+}
+.schedule-gantt__bar:hover { filter: brightness(1.15); }
+.schedule-gantt__bar--interrupt {
+  background: linear-gradient(135deg, #e65100, #ff8f00);
+}
+.schedule-gantt__bar-time {
+  font-size: 0.68rem; color: rgba(255,255,255,0.9);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 0.25rem;
+}
+
+.schedule-gantt__now-line {
+  position: absolute; top: -0.15rem; bottom: -0.15rem; width: 2px;
+  background: #ef5350; z-index: 2; pointer-events: none;
+}
+
+/* ── Schedule Playlist Strip ── */
+.schedule-playlist__header { margin-bottom: 0.75rem; }
+.schedule-playlist__header h2 { margin: 0 0 0.25rem; }
+.schedule-playlist__meta { margin: 0; color: #a8b3c5; font-size: 0.88rem; }
+
+.schedule-playlist__strip {
+  display: flex; flex-wrap: wrap; gap: 0.5rem;
+  list-style: none; margin: 0; padding: 0;
+}
+.schedule-chip {
+  display: flex; align-items: center; gap: 0.4rem;
+  background: #1f2a38; border: 1px solid #334155; border-radius: 0.5rem;
+  padding: 0.45rem 0.65rem; font-size: 0.85rem; max-width: 100%;
+}
+.schedule-chip__order {
+  flex-shrink: 0; width: 1.4rem; height: 1.4rem;
+  display: flex; align-items: center; justify-content: center;
+  background: #243041; border-radius: 50%; font-size: 0.72rem; font-weight: 700; color: #90caf9;
+}
+.schedule-chip__badge {
+  flex-shrink: 0; font-size: 0.72rem; font-weight: 600;
+  padding: 0.1rem 0.4rem; border-radius: 0.25rem;
+}
+.schedule-chip__badge--video { background: #1565c0; color: #bbdefb; }
+.schedule-chip__badge--image { background: #2e7d32; color: #c8e6c9; }
+.schedule-chip__badge--web { background: #6a1b9a; color: #e1bee7; }
+.schedule-chip__name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.schedule-chip__duration {
+  flex-shrink: 0; color: #a8b3c5; font-size: 0.8rem; font-variant-numeric: tabular-nums;
+}
+
+.schedule-playlist__details { margin-top: 0.75rem; }
+.schedule-playlist__toggle { font-size: 0.85rem; }
