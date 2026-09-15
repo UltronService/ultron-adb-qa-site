@@ -35,7 +35,7 @@ export function SchedulePlaylistStrip({
   selectedProjectId,
   onClearSelection,
 }: SchedulePlaylistStripProps) {
-  const [tableOpen, setTableOpen] = useState(false);
+  const [tableOpen, setTableOpen] = useState(true);
 
   const totalMedia = groups.reduce((sum, group) => sum + group.media.length, 0);
   const totalDuration = groups.reduce(
@@ -125,7 +125,7 @@ export function SchedulePlaylistStrip({
               onClick={() => setTableOpen((open) => !open)}
               aria-expanded={tableOpen}
             >
-              {tableOpen ? '收起完整表格' : '展開完整表格（進階）'}
+              {tableOpen ? '收起' : '展開完整表格'}
             </button>
 
             {tableOpen ? (
