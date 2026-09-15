@@ -1,0 +1,45 @@
+# logcat_filtered.txt
+# LIVE logcat dump from 192.168.1.148:5555 was NOT captured (adb LAN unreachable from investigator box).
+# Below: known session evidence supplied by operator + exact client log format proven by jadx decompile
+# of UltronProject product APK (classes matching UpdateSchedule error path).
+
+===== KNOWN SESSION EVIDENCE (operator-provided) =====
+Around 2026-09-15 17:54:34 (Asia/Taipei assumed):
+  [Debug][UpdateSchedule][error status code: 500]
+
+Same session (SEPARATE issue, concurrent only):
+  SpeedTestUtil XML parse failure
+  (class: com.ultron.player.util.speed_test.SpeedTestUtil — doSpeedTest path)
+  NOT a cause of HTTP 500 on UpdateSchedule.
+
+===== CLIENT LOG FORMAT (from decompiled DownloadFragmentViewModel$updateSchedule$1) =====
+On HTTP response.code() != 200:
+  UI LiveData mScheduleApiInfo <- "Failed: " + code
+    → download page shows e.g. failed:500 / Failed: 500
+  debugLog:
+    "[UpdateSchedule][error status code: " + code + "] " + response.message()
+  then sendDownloadPageLog(); play delayed 5000ms using existing local data if any.
+
+On exception:
+  "[UpdateSchedule][error] " + message
+  UI: "Failed: " + message
+
+===== REQUEST CONSTRUCTION (DownloadRepository.getSchedule) =====
+  ApiType.Devices.Schedules(deviceId, startDate, endDate)
+  GET {url}
+  Header: Authorization: Bearer {token}
+  No request body (OkHttp Request.Builder.url().addHeader().build())
+
+===== EXPECTED URL FOR THIS DEVICE =====
+  GET https://ultrontest.ddns.net/api/v1/devices/101/schedules?startDate=<today>&endDate=<today+7d>
+  Example for error day:
+  GET https://ultrontest.ddns.net/api/v1/devices/101/schedules?startDate=2026-09-15&endDate=2026-09-22
+
+===== UNAUTHENTICATED PROBE (investigator box, 2026-09-15) =====
+  curl → HTTP 401 {"message":"Unauthenticated."}
+  Confirms route exists on cloud; without Bearer token cannot reproduce body of 500.
+
+===== SEARCH TERMS USED (for future live logcat filter) =====
+  UpdateSchedule, GetSchedule, schedule, status code, 500, http, https,
+  retrofit, okhttp, download, Sync, UltronService, GOOGLE, CLUSTER,
+  DownloadVM, SpeedTestUtil

@@ -1,0 +1,30 @@
+# Ultron STB device identity — UpdateSchedule 500 investigation
+# Sources: prior screenshot /workspace/stb148_screen.png (captured earlier same day);
+#          APK decompile of product build 10053 (GCS) for API URL;
+#          live adb to 192.168.1.148:5555 NOT available from investigator box.
+
+[adb connectivity]
+target: 192.168.1.148:5555 (primary)
+also_mentioned: 192.168.1.176:5555
+result: BLOCKED — Linux investigator box has no route to office LAN 192.168.1.0/24.
+adb connect attempt: daemon started; devices list empty after connect timeout.
+
+[from prior UI screenshot stb148_screen.png]
+Local IP: 192.168.1.148
+Public IP: 1.164.183.8
+DeviceID (player): 101
+UUID: 29f51a59-b1df-491a-8338-8d5b0f8dbc58
+Set-Up Box: SPX432-03-UM
+VersionCode: 10054
+VersionName: v1.0.0(10054)_20260908
+UI branch/device label: 多專案排程 | 多專案排程 | 101
+CLUSTER toggle: ON
+Status strip: ONLINE; GOOGLE Success:1 Failed:0 DONE; UltronService Success:1 Failed:0 DONE
+Screenshot DeviceTime shown: 2026-09-15 09:12:50 (earlier than the 17:54:34 error window)
+
+[package]
+com.ultron.player
+Launch: com.ultron.player/.MainActivity
+
+[note]
+Live pull of ultron_project.db / fresh logcat was not possible without LAN adb.

@@ -1,0 +1,29 @@
+# schedule_db_snapshot.txt
+# LIVE SQLite pull from device NOT performed (adb unreachable).
+
+[intended queries — for Windows host when adb available]
+ADB=C:\adb\platform-tools\adb.exe
+DEV=192.168.1.148:5555
+PKG=com.ultron.player
+DB=databases/ultron_project
+
+# Login / device profile
+$ADB -s $DEV shell "run-as com.ultron.player sqlite3 databases/ultron_project \"SELECT brandName, branchName, categoryName, deviceId, lastGetScheduleDate FROM login LIMIT 5;\""
+
+# Schedule rows
+$ADB -s $DEV shell "run-as com.ultron.player sqlite3 databases/ultron_project \"SELECT date, projectIds FROM schedule ORDER BY date DESC LIMIT 14;\""
+
+# Project count / sample
+$ADB -s $DEV shell "run-as com.ultron.player sqlite3 databases/ultron_project \"SELECT COUNT(*) FROM project;\""
+$ADB -s $DEV shell "run-as com.ultron.player sqlite3 databases/ultron_project \"SELECT id, layoutId, startDate, endDate, startTime, endTime FROM project LIMIT 20;\""
+
+[QA agent distinction — agent/services/adb_service.py]
+QA agent reads LOCAL Room/SQLite on device via adb run-as sqlite3.
+Those URLs/paths are NOT the cloud UpdateSchedule endpoint.
+Cloud UpdateSchedule (from APK ApiType.Devices.Schedules):
+  https://ultrontest.ddns.net/api/v1/devices/{deviceId}/schedules?startDate=&endDate=
+
+[inference from UI screenshot earlier same day]
+DeviceID=101 was bound and ONLINE with UltronService success before the 17:54 500.
+lastGetScheduleDate / schedule table freshness AFTER the 500 is UNKNOWN without DB pull.
+On 500 the client does NOT saveSchedule(); it keeps prior local DB and may still Play after 5s.
