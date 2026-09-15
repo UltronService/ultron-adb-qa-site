@@ -21,6 +21,9 @@ export function mapMockDeviceToApi(device: (typeof MOCK_DEVICES)[number]): Devic
     category_name: device.categoryName,
     installed_apk_version: device.installedApkVersion,
     last_schedule_sync_at: device.lastScheduleSyncAt,
+    setup_box: device.setupBox,
+    public_ip: device.publicIp,
+    version_code: device.versionCode,
   };
 }
 

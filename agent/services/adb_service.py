@@ -3,6 +3,8 @@ import re
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -31,6 +33,7 @@ class HardwareGetpropProfile:
     product_brand: str = ""
     product_manufacturer: str = ""
     product_model: str = ""
+    setup_box: str = ""
 
 
 @dataclass(frozen=True)
@@ -41,12 +44,20 @@ class UltronPlayerProfile:
     category_name: str = ""
     installed_apk_version: str = ""
     last_schedule_sync_at: str = ""
+    version_code: str = ""
+
+
+@dataclass(frozen=True)
+class InstalledApkInfo:
+    version_name: str = ""
+    version_code: str = ""
 
 
 class AdbService:
     """ADB command wrappers with mock fallback when adb is unavailable."""
 
     def __init__(self) -> None:
+        self._cached_public_ip: str | None = None
         self._mock_devices: list[DeviceInfo] = [
             DeviceInfo(
                 id="stb-176",
@@ -61,12 +72,15 @@ class AdbService:
                 product_brand="AOC",
                 product_manufacturer="TAISHAN",
                 product_model="Hi3751V560",
-                brand_name="Demo Brand",
-                branch_name="Demo Store 176",
+                brand_name="奧創傳媒",
+                branch_name="台北信義店",
                 player_device_id=1001,
                 category_name="大螢幕",
                 installed_apk_version="v1.0.0(10053)",
                 last_schedule_sync_at="2026-09-14",
+                setup_box="SPX432-01-UM",
+                public_ip="1.164.183.8",
+                version_code="10053",
             ),
             DeviceInfo(
                 id="stb-148",
@@ -81,12 +95,15 @@ class AdbService:
                 product_brand="AOC",
                 product_manufacturer="TAISHAN",
                 product_model="taishan",
-                brand_name="Demo Brand",
-                branch_name="Demo Store 148",
-                player_device_id=1002,
+                brand_name="奧創傳媒",
+                branch_name="多專案排程",
+                player_device_id=101,
                 category_name="櫃台",
-                installed_apk_version="v1.0.0(10053)",
+                installed_apk_version="v1.0.0(10054)",
                 last_schedule_sync_at="2026-09-14",
+                setup_box="SPX432-03-UM",
+                public_ip="1.164.183.8",
+                version_code="10054",
             ),
         ]
 
@@ -435,15 +452,20 @@ class AdbService:
             return device
 
         try:
-            ultron_profile, hardware_profile = await asyncio.gather(
+            ultron_profile, hardware_profile, public_ip = await asyncio.gather(
                 self._fetch_ultron_player_profile(device.id),
                 self._fetch_hardware_getprop(device.id),
+                self._fetch_public_ip(),
             )
         except (OSError, NotImplementedError, RuntimeError):
             return device
 
         return device.model_copy(
-            update={**asdict(ultron_profile), **asdict(hardware_profile)},
+            update={
+                **asdict(ultron_profile),
+                **asdict(hardware_profile),
+                "public_ip": public_ip,
+            },
         )
 
     async def _fetch_hardware_getprop(self, device_id: str) -> HardwareGetpropProfile:
@@ -452,13 +474,54 @@ class AdbService:
             ("product_manufacturer", "ro.product.manufacturer"),
             ("product_model", "ro.product.model"),
         )
-        tasks = [self._fetch_getprop_value(device_id, prop_key) for _, prop_key in props]
-        values = await asyncio.gather(*tasks)
+        getprop_tasks = [self._fetch_getprop_value(device_id, prop_key) for _, prop_key in props]
+        setup_box_task = self._fetch_setup_box(device_id)
+        values = await asyncio.gather(*getprop_tasks, setup_box_task)
         return HardwareGetpropProfile(
             product_brand=values[0],
             product_manufacturer=values[1],
             product_model=values[2],
+            setup_box=values[3],
         )
+
+    async def _fetch_setup_box(self, device_id: str) -> str:
+        try:
+            return_code, stdout, _stderr = await self._run_adb(
+                "-s",
+                device_id,
+                "shell",
+                "settings",
+                "get",
+                "global",
+                "device_name",
+                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+            )
+        except (OSError, NotImplementedError):
+            return ""
+
+        if return_code != 0:
+            return ""
+
+        value = stdout.strip()
+        if not value or value.lower() == "null":
+            return ""
+
+        return value
+
+    async def _fetch_public_ip(self) -> str:
+        if self._cached_public_ip is not None:
+            return self._cached_public_ip
+
+        def _sync_fetch() -> str:
+            try:
+                with urllib.request.urlopen("https://api.ipify.org", timeout=5) as response:
+                    return response.read().decode("utf-8").strip()
+            except (OSError, urllib.error.URLError, TimeoutError):
+                return ""
+
+        public_ip = await asyncio.to_thread(_sync_fetch)
+        self._cached_public_ip = public_ip
+        return public_ip
 
     async def _fetch_getprop_value(self, device_id: str, prop_key: str) -> str:
         try:
@@ -480,11 +543,14 @@ class AdbService:
 
     async def _fetch_ultron_player_profile(self, device_id: str) -> UltronPlayerProfile:
         login_task = self._fetch_ultron_login_row(device_id)
-        apk_task = self._fetch_installed_apk_version(device_id)
-        login_row, installed_apk_version = await asyncio.gather(login_task, apk_task)
+        apk_task = self._fetch_installed_apk_info(device_id)
+        login_row, apk_info = await asyncio.gather(login_task, apk_task)
 
         if login_row is None:
-            return UltronPlayerProfile(installed_apk_version=installed_apk_version)
+            return UltronPlayerProfile(
+                installed_apk_version=apk_info.version_name,
+                version_code=apk_info.version_code,
+            )
 
         brand_name, branch_name, category_name, player_device_id, last_schedule_sync_at = login_row
         return UltronPlayerProfile(
@@ -492,8 +558,9 @@ class AdbService:
             branch_name=branch_name,
             player_device_id=player_device_id,
             category_name=category_name,
-            installed_apk_version=installed_apk_version,
+            installed_apk_version=apk_info.version_name,
             last_schedule_sync_at=last_schedule_sync_at,
+            version_code=apk_info.version_code,
         )
 
     async def _fetch_ultron_login_row(
@@ -534,7 +601,7 @@ class AdbService:
         last_schedule_sync_at = parts[4].strip()
         return brand_name, branch_name, category_name, player_device_id, last_schedule_sync_at
 
-    async def _fetch_installed_apk_version(self, device_id: str) -> str:
+    async def _fetch_installed_apk_info(self, device_id: str) -> InstalledApkInfo:
         try:
             return_code, stdout, _stderr = await self._run_adb(
                 "-s",
@@ -546,17 +613,21 @@ class AdbService:
                 timeout_sec=ADB_SHELL_TIMEOUT_SEC,
             )
         except (OSError, NotImplementedError):
-            return ""
+            return InstalledApkInfo()
 
         if return_code != 0:
-            return ""
+            return InstalledApkInfo()
 
+        version_name = ""
+        version_code = ""
         for line in stdout.splitlines():
             stripped = line.strip()
             if stripped.startswith("versionName="):
-                return stripped.split("=", 1)[1].strip()
+                version_name = stripped.split("=", 1)[1].strip()
+            elif stripped.startswith("versionCode="):
+                version_code = stripped.split("=", 1)[1].split()[0].strip()
 
-        return ""
+        return InstalledApkInfo(version_name=version_name, version_code=version_code)
 
     @staticmethod
     def _parse_optional_int(raw: str) -> int | None:

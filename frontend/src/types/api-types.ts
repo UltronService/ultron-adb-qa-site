@@ -17,6 +17,9 @@ export interface DeviceInfo {
   category_name?: string;
   installed_apk_version?: string;
   last_schedule_sync_at?: string;
+  setup_box?: string;
+  public_ip?: string;
+  version_code?: string;
 }
 
 export interface ApkInfo {

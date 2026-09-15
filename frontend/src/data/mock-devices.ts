@@ -17,6 +17,9 @@ export interface MockDevice {
   categoryName: string;
   installedApkVersion: string;
   lastScheduleSyncAt: string;
+  setupBox: string;
+  publicIp: string;
+  versionCode: string;
 }
 
 export const MOCK_DEVICES: MockDevice[] = [
@@ -33,12 +36,15 @@ export const MOCK_DEVICES: MockDevice[] = [
     productBrand: 'AOC',
     productManufacturer: 'TAISHAN',
     productModel: 'Hi3751V560',
-    brandName: 'Demo Brand',
+    brandName: '奧創傳媒',
     branchName: '台北信義店',
     playerDeviceId: 1001,
     categoryName: '大螢幕',
     installedApkVersion: 'v1.0.0(10053)',
     lastScheduleSyncAt: '2026-09-14',
+    setupBox: 'SPX432-01-UM',
+    publicIp: '1.164.183.8',
+    versionCode: '10053',
   },
   {
     id: 'stb-148',
@@ -53,12 +59,15 @@ export const MOCK_DEVICES: MockDevice[] = [
     productBrand: 'AOC',
     productManufacturer: 'TAISHAN',
     productModel: 'taishan',
-    brandName: 'Demo Brand',
-    branchName: '台中逢甲店',
-    playerDeviceId: 1002,
+    brandName: '奧創傳媒',
+    branchName: '多專案排程',
+    playerDeviceId: 101,
     categoryName: '櫃台',
-    installedApkVersion: 'v1.0.0(10053)',
+    installedApkVersion: 'v1.0.0(10054)',
     lastScheduleSyncAt: '2026-09-14',
+    setupBox: 'SPX432-03-UM',
+    publicIp: '1.164.183.8',
+    versionCode: '10054',
   },
   {
     id: 'stb-spare',
@@ -79,5 +88,8 @@ export const MOCK_DEVICES: MockDevice[] = [
     categoryName: '',
     installedApkVersion: '',
     lastScheduleSyncAt: '',
+    setupBox: '',
+    publicIp: '',
+    versionCode: '',
   },
 ];
