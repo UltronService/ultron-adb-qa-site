@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { connectDevice, fetchDevices, scanDevices } from '../api/device-api';
 import { Drawer } from '../components/ui/drawer';
 import { Skeleton } from '../components/ui/skeleton';
@@ -176,6 +177,13 @@ export function DevicesPage() {
               >
                 詳情
               </button>
+              <Link
+                className="btn btn--secondary"
+                to={`/schedule?device=${encodeURIComponent(device.id)}`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                排程／素材
+              </Link>
             </div>
           </article>
         ))}
@@ -189,6 +197,14 @@ export function DevicesPage() {
         {detailDevice ? (
           <>
             <DeviceMetaSections device={detailDevice} variant="detail" />
+            <div className="device-card__actions">
+              <Link
+                className="btn btn--primary"
+                to={`/schedule?device=${encodeURIComponent(detailDevice.id)}`}
+              >
+                排程／素材
+              </Link>
+            </div>
             <p className="page-footer">點選卡片可查看規格；勾選後可用上方批次操作列。</p>
           </>
         ) : null}
