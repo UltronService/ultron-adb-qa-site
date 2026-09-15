@@ -4,7 +4,7 @@ import { fetchDevices } from '../api/device-api';
 import { fetchScheduleMedia } from '../api/schedule-api';
 import { ScheduleGantt } from '../components/schedule-gantt';
 import { ScheduleNowSummary } from '../components/schedule-now-summary';
-import { SchedulePlaylistStrip } from '../components/schedule-playlist-strip';
+import { ScheduleMediaTable } from '../components/schedule-media-table';
 import { Skeleton } from '../components/ui/skeleton';
 import { useDemoMode } from '../hooks/use-demo-mode';
 import {
@@ -110,14 +110,6 @@ export function SchedulePage() {
     );
   }, [scheduleData]);
 
-  useEffect(() => {
-    if (selectedProjectId === null) {
-      return;
-    }
-    const target = document.getElementById(`schedule-project-group-${selectedProjectId}`);
-    target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [selectedProjectId, mediaGroups]);
-
   const handleDeviceChange = (deviceId: string) => {
     if (!deviceId) {
       setSearchParams({});
@@ -151,7 +143,7 @@ export function SchedulePage() {
 
       <div className="schedule-hint panel">
         <strong>說明：</strong>
-        素材只有日期與播放秒數；幾點到幾點由專案時段決定。專案名稱取自版面（layout），點選甘特圖可捲動至對應素材分組。
+        素材只有日期與播放秒數；幾點到幾點由專案時段決定。專案標籤取自版面（layout），點甘特圖時段可對應下方表格。
       </div>
 
       {!selectedDeviceId ? (
@@ -237,7 +229,7 @@ export function SchedulePage() {
                 onSelectProject={setSelectedProjectId}
               />
 
-              <SchedulePlaylistStrip
+              <ScheduleMediaTable
                 groups={mediaGroups}
                 selectedProjectId={selectedProjectId}
                 onClearSelection={() => setSelectedProjectId(null)}
