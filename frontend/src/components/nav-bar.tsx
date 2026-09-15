@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const NAV_ITEMS = [
   { path: '/', label: '總覽' },
   { path: '/devices', label: '裝置' },
+  { path: '/schedule', label: '排程／素材' },
   { path: '/console', label: '主控台' },
   { path: '/apk', label: 'APK' },
   { path: '/automation', label: '自動化' },

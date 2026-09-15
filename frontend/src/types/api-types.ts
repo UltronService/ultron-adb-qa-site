@@ -67,3 +67,38 @@ export interface ReportDiff {
   candidate_label: string;
   diff_score: number;
 }
+
+export interface ProjectScheduleItem {
+  id: number;
+  layout_id?: number | null;
+  start_date: string;
+  end_date: string;
+  start_time: string;
+  end_time: string;
+  day_of_weeks: string;
+  is_interrupt: boolean;
+}
+
+export interface MediaScheduleItem {
+  id: number;
+  name: string;
+  type: string;
+  duration_sec: number;
+  start_date: string;
+  end_date: string;
+  file_name: string;
+}
+
+export interface TodaySchedule {
+  date: string;
+  project_ids: number[];
+}
+
+export interface ScheduleMediaResponse {
+  device_id: string;
+  projects: ProjectScheduleItem[];
+  media: MediaScheduleItem[];
+  today_schedule?: TodaySchedule | null;
+  mock?: boolean;
+  error?: string;
+}

@@ -9,13 +9,26 @@ from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
-from models.schemas import DeviceInfo
+from models.schemas import (
+    DeviceInfo,
+    MediaScheduleItem,
+    ProjectScheduleItem,
+    ScheduleMediaResponse,
+    TodaySchedule,
+)
 
 ULTRON_PLAYER_PACKAGE = "com.ultron.player"
 ULTRON_DB_PATH = "databases/ultron_project"
 ULTRON_LOGIN_SQL = (
     "SELECT brandName, branchName, categoryName, deviceId, lastGetScheduleDate "
     "FROM login LIMIT 1;"
+)
+ULTRON_PROJECTS_SQL = (
+    "SELECT id, layoutId, startDate, endDate, startTime, endTime, dayOfWeeks, isInterrupt "
+    "FROM project;"
+)
+ULTRON_MEDIA_SQL = (
+    "SELECT id, name, type, duration, startDate, endDate, param FROM media;"
 )
 ADB_SHELL_TIMEOUT_SEC = 8.0
 
@@ -431,6 +444,47 @@ class AdbService:
         ]
         return lines[-max_lines:]
 
+    async def fetch_schedule_media(self, device_id: str) -> ScheduleMediaResponse:
+        normalized_id = device_id.strip()
+        if not normalized_id:
+            raise ValueError("Device id is required")
+
+        if not self.adb_available:
+            return self._mock_schedule_media(normalized_id)
+
+        try:
+            projects, media, today_schedule = await asyncio.gather(
+                self._fetch_ultron_projects(normalized_id),
+                self._fetch_ultron_media(normalized_id),
+                self._fetch_ultron_today_schedule(normalized_id),
+            )
+        except (OSError, NotImplementedError, RuntimeError) as error:
+            raise RuntimeError(f"無法讀取排程資料：{error}") from error
+
+        if not projects and not media:
+            mock_match = next(
+                (
+                    device
+                    for device in self._mock_devices
+                    if device.id == normalized_id or device.ip == normalized_id
+                ),
+                None,
+            )
+            if mock_match is not None:
+                return self._mock_schedule_media(mock_match.id)
+
+            raise RuntimeError(
+                "找不到 Ultron Player 排程資料庫，請確認裝置已安裝並登入 Player"
+            )
+
+        return ScheduleMediaResponse(
+            device_id=normalized_id,
+            projects=projects,
+            media=media,
+            today_schedule=today_schedule,
+            mock=False,
+        )
+
     async def launch_activity(self, device_id: str, component: str) -> None:
         if not self.adb_available:
             return
@@ -563,6 +617,149 @@ class AdbService:
             version_code=apk_info.version_code,
         )
 
+    async def _run_ultron_sql(self, device_id: str, sql: str) -> list[list[str]]:
+        shell_command = (
+            f"run-as {ULTRON_PLAYER_PACKAGE} sqlite3 {ULTRON_DB_PATH} "
+            f"\"{sql.strip()}\""
+        )
+        try:
+            return_code, stdout, _stderr = await self._run_adb(
+                "-s",
+                device_id,
+                "shell",
+                shell_command,
+                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+            )
+        except (OSError, NotImplementedError):
+            return []
+
+        if return_code != 0:
+            return []
+
+        rows: list[list[str]] = []
+        for line in stdout.strip().splitlines():
+            if not line.strip():
+                continue
+            rows.append(line.split("|"))
+        return rows
+
+    async def _fetch_ultron_projects(self, device_id: str) -> list[ProjectScheduleItem]:
+        rows = await self._run_ultron_sql(device_id, ULTRON_PROJECTS_SQL)
+        projects: list[ProjectScheduleItem] = []
+        for parts in rows:
+            if len(parts) < 8:
+                continue
+            projects.append(
+                ProjectScheduleItem(
+                    id=self._parse_optional_int(parts[0]) or 0,
+                    layout_id=self._parse_optional_int(parts[1]),
+                    start_date=parts[2].strip(),
+                    end_date=parts[3].strip(),
+                    start_time=parts[4].strip(),
+                    end_time=parts[5].strip(),
+                    day_of_weeks=parts[6].strip(),
+                    is_interrupt=self._parse_bool(parts[7]),
+                ),
+            )
+        return projects
+
+    async def _fetch_ultron_media(self, device_id: str) -> list[MediaScheduleItem]:
+        rows = await self._run_ultron_sql(device_id, ULTRON_MEDIA_SQL)
+        media_items: list[MediaScheduleItem] = []
+        for parts in rows:
+            if len(parts) < 7:
+                continue
+            media_items.append(
+                MediaScheduleItem(
+                    id=self._parse_optional_int(parts[0]) or 0,
+                    name=parts[1].strip(),
+                    type=parts[2].strip(),
+                    duration_sec=self._parse_optional_int(parts[3]) or 0,
+                    start_date=parts[4].strip(),
+                    end_date=parts[5].strip(),
+                    file_name=parts[6].strip(),
+                ),
+            )
+        return media_items
+
+    async def _fetch_ultron_today_schedule(self, device_id: str) -> TodaySchedule | None:
+        today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        sql = f"SELECT date, projectIds FROM schedule WHERE date = '{today}' LIMIT 1;"
+        rows = await self._run_ultron_sql(device_id, sql)
+        if not rows or len(rows[0]) < 2:
+            return None
+
+        date_value = rows[0][0].strip()
+        project_ids = self._parse_id_list(rows[0][1])
+        return TodaySchedule(date=date_value, project_ids=project_ids)
+
+    def _mock_schedule_media(self, device_id: str) -> ScheduleMediaResponse:
+        mock_device = next(
+            (device for device in self._mock_devices if device.id == device_id),
+            None,
+        )
+        label = mock_device.branch_name if mock_device else "展示裝置"
+
+        projects = [
+            ProjectScheduleItem(
+                id=1,
+                layout_id=10,
+                start_date="2026-01-01",
+                end_date="2026-12-31",
+                start_time="08:00:00",
+                end_time="22:00:00",
+                day_of_weeks="1,2,3,4,5,6,7",
+                is_interrupt=False,
+            ),
+            ProjectScheduleItem(
+                id=2,
+                layout_id=11,
+                start_date="2026-09-01",
+                end_date="2026-09-30",
+                start_time="12:00:00",
+                end_time="13:00:00",
+                day_of_weeks="1,2,3,4,5",
+                is_interrupt=True,
+            ),
+        ]
+        media_items = [
+            MediaScheduleItem(
+                id=101,
+                name=f"{label} 開場影片",
+                type="video",
+                duration_sec=15,
+                start_date="2026-01-01",
+                end_date="2026-12-31",
+                file_name="intro_2026.mp4",
+            ),
+            MediaScheduleItem(
+                id=102,
+                name="午間促銷圖",
+                type="image",
+                duration_sec=10,
+                start_date="2026-09-01",
+                end_date="2026-09-30",
+                file_name="lunch_promo.jpg",
+            ),
+            MediaScheduleItem(
+                id=103,
+                name="天氣資訊",
+                type="web",
+                duration_sec=30,
+                start_date="2026-01-01",
+                end_date="2026-12-31",
+                file_name="https://weather.example.com/widget",
+            ),
+        ]
+        today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
+        return ScheduleMediaResponse(
+            device_id=device_id,
+            projects=projects,
+            media=media_items,
+            today_schedule=TodaySchedule(date=today, project_ids=[1, 2]),
+            mock=True,
+        )
+
     async def _fetch_ultron_login_row(
         self,
         device_id: str,
@@ -628,6 +825,27 @@ class AdbService:
                 version_code = stripped.split("=", 1)[1].split()[0].strip()
 
         return InstalledApkInfo(version_name=version_name, version_code=version_code)
+
+    @staticmethod
+    def _parse_bool(raw: str) -> bool:
+        normalized = raw.strip().lower()
+        return normalized in {"1", "true", "yes"}
+
+    @staticmethod
+    def _parse_id_list(raw: str) -> list[int]:
+        normalized = raw.strip().strip("[]")
+        if not normalized:
+            return []
+
+        ids: list[int] = []
+        for token in normalized.split(","):
+            value = token.strip().strip('"').strip("'")
+            if not value:
+                continue
+            parsed = AdbService._parse_optional_int(value)
+            if parsed is not None:
+                ids.append(parsed)
+        return ids
 
     @staticmethod
     def _parse_optional_int(raw: str) -> int | None:
