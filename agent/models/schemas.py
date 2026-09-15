@@ -137,12 +137,14 @@ class ProjectScheduleItem(BaseModel):
     id: int
     name: str = ""
     layout_id: int | None = None
+    layout_name: str = ""
     start_date: str = ""
     end_date: str = ""
     start_time: str = ""
     end_time: str = ""
     day_of_weeks: str = ""
     is_interrupt: bool = False
+    media_ids: list[int] = Field(default_factory=list)
 
 
 class TimeTableEntry(BaseModel):

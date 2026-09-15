@@ -59,15 +59,17 @@ export function formatTimeRange(startTime: string, endTime: string): string {
 }
 
 export function formatProjectLabel(project: ProjectScheduleItem): string {
-  const name = project.name?.trim();
-  if (name) {
-    return name;
+  const timeRange = formatTimeRange(project.start_time, project.end_time);
+  const idPart = `專案 ${project.id}`;
+  const layoutName = project.layout_name?.trim();
+  if (layoutName) {
+    return `${timeRange}（${idPart}｜${layoutName}）`;
   }
-  return `專案 ${project.id}`;
+  return `${timeRange}（${idPart}）`;
 }
 
 export function formatProjectRowLabel(project: ProjectScheduleItem): string {
-  return `${formatProjectLabel(project)}｜${formatTimeRange(project.start_time, project.end_time)}`;
+  return formatProjectLabel(project);
 }
 
 export function formatNowClock(date: Date = new Date()): string {

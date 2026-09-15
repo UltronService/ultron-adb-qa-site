@@ -34,6 +34,7 @@ ULTRON_MEDIA_SQL = (
 ULTRON_TIME_TABLE_SQL = (
     "SELECT projectId, mediaId, sequence FROM time_table ORDER BY projectId, sequence;"
 )
+ULTRON_LAYOUTS_SQL = "SELECT id, name FROM layout;"
 ADB_SHELL_TIMEOUT_SEC = 8.0
 
 LOG_LEVEL_MAP = {
@@ -457,14 +458,17 @@ class AdbService:
             return self._mock_schedule_media(normalized_id)
 
         try:
-            projects, media, time_table, today_schedule = await asyncio.gather(
+            projects, media, time_table, today_schedule, layouts = await asyncio.gather(
                 self._fetch_ultron_projects(normalized_id),
                 self._fetch_ultron_media(normalized_id),
                 self._fetch_ultron_time_table(normalized_id),
                 self._fetch_ultron_today_schedule(normalized_id),
+                self._fetch_ultron_layouts(normalized_id),
             )
         except (OSError, NotImplementedError, RuntimeError) as error:
             raise RuntimeError(f"無法讀取排程資料：{error}") from error
+
+        projects = self._enrich_projects(projects, layouts, time_table)
 
         if not projects and not media:
             mock_match = next(
@@ -688,6 +692,52 @@ class AdbService:
             )
         return media_items
 
+    async def _fetch_ultron_layouts(self, device_id: str) -> dict[int, str]:
+        rows = await self._run_ultron_sql(device_id, ULTRON_LAYOUTS_SQL)
+        layouts: dict[int, str] = {}
+        for parts in rows:
+            if len(parts) < 2:
+                continue
+            layout_id = self._parse_optional_int(parts[0])
+            if layout_id is None:
+                continue
+            layouts[layout_id] = parts[1].strip()
+        return layouts
+
+    def _enrich_projects(
+        self,
+        projects: list[ProjectScheduleItem],
+        layouts: dict[int, str],
+        time_table: list[TimeTableEntry],
+    ) -> list[ProjectScheduleItem]:
+        media_ids_by_project: dict[int, list[tuple[int, int]]] = {}
+        for entry in time_table:
+            media_ids_by_project.setdefault(entry.project_id, []).append(
+                (entry.sequence, entry.media_id),
+            )
+
+        enriched: list[ProjectScheduleItem] = []
+        for project in projects:
+            layout_name = ""
+            if project.layout_id is not None:
+                layout_name = layouts.get(project.layout_id, "")
+
+            ordered_entries = sorted(
+                media_ids_by_project.get(project.id, []),
+                key=lambda item: item[0],
+            )
+            media_ids = [media_id for _, media_id in ordered_entries]
+
+            enriched.append(
+                project.model_copy(
+                    update={
+                        "layout_name": layout_name,
+                        "media_ids": media_ids,
+                    },
+                ),
+            )
+        return enriched
+
     async def _fetch_ultron_time_table(self, device_id: str) -> list[TimeTableEntry]:
         rows = await self._run_ultron_sql(device_id, ULTRON_TIME_TABLE_SQL)
         entries: list[TimeTableEntry] = []
@@ -724,25 +774,27 @@ class AdbService:
         projects = [
             ProjectScheduleItem(
                 id=1,
-                name=f"{label} 主檔",
                 layout_id=10,
+                layout_name="Basic 1920x1080 16:9",
                 start_date="2026-01-01",
                 end_date="2026-12-31",
                 start_time="08:00:00",
                 end_time="22:00:00",
                 day_of_weeks="1,2,3,4,5,6,7",
                 is_interrupt=False,
+                media_ids=[101, 103],
             ),
             ProjectScheduleItem(
                 id=2,
-                name="午間促銷插播",
                 layout_id=11,
+                layout_name="Basic 1920x1080 16:9",
                 start_date="2026-09-01",
                 end_date="2026-09-30",
                 start_time="12:00:00",
                 end_time="13:00:00",
                 day_of_weeks="1,2,3,4,5",
                 is_interrupt=True,
+                media_ids=[102],
             ),
         ]
         media_items = [

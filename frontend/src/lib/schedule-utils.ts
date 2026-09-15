@@ -1,5 +1,6 @@
 import type {
   MediaScheduleItem,
+  ProjectMediaGroup,
   ProjectScheduleItem,
   TimeTableEntry,
   TodaySchedule,
@@ -171,29 +172,66 @@ export function getDefaultSelectedProjectId(
   return sorted[0]?.id ?? null;
 }
 
-export function filterMediaForProject(
-  media: MediaScheduleItem[],
+export function getProjectMediaIds(
+  project: ProjectScheduleItem,
   timeTable: TimeTableEntry[],
-  projectId: number,
+): number[] {
+  const fromProject = project.media_ids ?? [];
+  if (fromProject.length > 0) {
+    return fromProject;
+  }
+
+  return timeTable
+    .filter((entry) => entry.project_id === project.id)
+    .sort((left, right) => left.sequence - right.sequence)
+    .map((entry) => entry.media_id);
+}
+
+export function resolveMediaForProject(
+  media: MediaScheduleItem[],
+  project: ProjectScheduleItem,
+  timeTable: TimeTableEntry[],
 ): MediaScheduleItem[] {
-  const entries = timeTable
-    .filter((entry) => entry.project_id === projectId)
-    .sort((left, right) => left.sequence - right.sequence);
-  if (entries.length === 0) {
-    return media;
+  const mediaIds = getProjectMediaIds(project, timeTable);
+  if (mediaIds.length === 0) {
+    return [];
   }
 
   const mediaById = new Map(media.map((item) => [item.id, item]));
-  const ordered = entries
-    .map((entry) => mediaById.get(entry.media_id))
+  return mediaIds
+    .map((mediaId) => mediaById.get(mediaId))
     .filter((item): item is MediaScheduleItem => item !== undefined);
-
-  return ordered.length > 0 ? ordered : media;
 }
 
 export function hasProjectMediaMapping(
+  project: ProjectScheduleItem,
   timeTable: TimeTableEntry[],
-  projectId: number,
 ): boolean {
-  return timeTable.some((entry) => entry.project_id === projectId);
+  if ((project.media_ids?.length ?? 0) > 0) {
+    return true;
+  }
+  return timeTable.some((entry) => entry.project_id === project.id);
+}
+
+export function buildProjectMediaGroups(
+  projects: ProjectScheduleItem[],
+  media: MediaScheduleItem[],
+  timeTable: TimeTableEntry[],
+  dateStr: string,
+  projectIds?: number[],
+): ProjectMediaGroup[] {
+  const activeProjects = sortProjectsByStartTime(
+    filterActiveProjects(projects, dateStr, projectIds),
+  );
+
+  const groups: ProjectMediaGroup[] = [];
+  for (const project of activeProjects) {
+    const groupMedia = resolveMediaForProject(media, project, timeTable);
+    if (groupMedia.length === 0 && !hasProjectMediaMapping(project, timeTable)) {
+      continue;
+    }
+    groups.push({ project, media: groupMedia });
+  }
+
+  return groups;
 }

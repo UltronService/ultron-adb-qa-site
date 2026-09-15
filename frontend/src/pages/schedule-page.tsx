@@ -8,8 +8,8 @@ import { SchedulePlaylistStrip } from '../components/schedule-playlist-strip';
 import { Skeleton } from '../components/ui/skeleton';
 import { useDemoMode } from '../hooks/use-demo-mode';
 import {
+  buildProjectMediaGroups,
   filterActiveProjects,
-  filterMediaForProject,
   getDefaultSelectedProjectId,
   getViewDate,
 } from '../lib/schedule-utils';
@@ -96,19 +96,27 @@ export function SchedulePage() {
     setSelectedProjectId(defaultProjectId);
   }, [scheduleData?.device_id, defaultProjectId]);
 
-  const displayedMedia = useMemo(() => {
+  const mediaGroups = useMemo(() => {
     if (!scheduleData) {
       return [];
     }
-    if (selectedProjectId === null) {
-      return scheduleData.media;
-    }
-    return filterMediaForProject(
+    const viewDate = getViewDate(scheduleData.today_schedule);
+    return buildProjectMediaGroups(
+      scheduleData.projects,
       scheduleData.media,
       scheduleData.time_table ?? [],
-      selectedProjectId,
+      viewDate,
+      scheduleData.today_schedule?.project_ids,
     );
-  }, [scheduleData, selectedProjectId]);
+  }, [scheduleData]);
+
+  useEffect(() => {
+    if (selectedProjectId === null) {
+      return;
+    }
+    const target = document.getElementById(`schedule-project-group-${selectedProjectId}`);
+    target?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedProjectId, mediaGroups]);
 
   const handleDeviceChange = (deviceId: string) => {
     if (!deviceId) {
@@ -143,7 +151,7 @@ export function SchedulePage() {
 
       <div className="schedule-hint panel">
         <strong>說明：</strong>
-        素材只有日期與播放秒數；幾點到幾點由專案時段決定。點選甘特圖時段可篩選下方素材。
+        素材只有日期與播放秒數；幾點到幾點由專案時段決定。專案名稱取自版面（layout），點選甘特圖可捲動至對應素材分組。
       </div>
 
       {!selectedDeviceId ? (
@@ -230,9 +238,7 @@ export function SchedulePage() {
               />
 
               <SchedulePlaylistStrip
-                media={displayedMedia}
-                projects={scheduleData.projects}
-                timeTable={scheduleData.time_table}
+                groups={mediaGroups}
                 selectedProjectId={selectedProjectId}
                 onClearSelection={() => setSelectedProjectId(null)}
               />

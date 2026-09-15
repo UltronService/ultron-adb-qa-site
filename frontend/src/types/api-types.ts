@@ -72,12 +72,19 @@ export interface ProjectScheduleItem {
   id: number;
   name?: string;
   layout_id?: number | null;
+  layout_name?: string;
   start_date: string;
   end_date: string;
   start_time: string;
   end_time: string;
   day_of_weeks: string;
   is_interrupt: boolean;
+  media_ids?: number[];
+}
+
+export interface ProjectMediaGroup {
+  project: ProjectScheduleItem;
+  media: MediaScheduleItem[];
 }
 
 export interface TimeTableEntry {
