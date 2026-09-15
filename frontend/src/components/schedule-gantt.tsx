@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import {
   formatDateRange,
   formatDayOfWeeks,
+  formatProjectRowLabel,
   formatTimeRange,
 } from '../lib/format-schedule';
 import {
@@ -17,6 +18,8 @@ import type { ProjectScheduleItem, TodaySchedule } from '../types/api-types';
 interface ScheduleGanttProps {
   projects: ProjectScheduleItem[];
   todaySchedule?: TodaySchedule | null;
+  selectedProjectId?: number | null;
+  onSelectProject?: (projectId: number) => void;
 }
 
 function buildBarStyle(project: ProjectScheduleItem): { left: string; width: string } {
@@ -26,7 +29,12 @@ function buildBarStyle(project: ProjectScheduleItem): { left: string; width: str
   return { left: `${left}%`, width: `${width}%` };
 }
 
-export function ScheduleGantt({ projects, todaySchedule }: ScheduleGanttProps) {
+export function ScheduleGantt({
+  projects,
+  todaySchedule,
+  selectedProjectId,
+  onSelectProject,
+}: ScheduleGanttProps) {
   const viewDate = getViewDate(todaySchedule);
   const projectIds = todaySchedule?.project_ids;
 
@@ -38,15 +46,17 @@ export function ScheduleGantt({ projects, todaySchedule }: ScheduleGanttProps) {
   const showNowLine = isToday(viewDate);
   const nowPercent = showNowLine ? getNowPercent() : 0;
 
+  const handleSelect = (projectId: number) => {
+    onSelectProject?.(projectId);
+  };
+
   return (
     <section className="panel schedule-gantt">
       <div className="schedule-gantt__header">
         <h2>今日甘特圖</h2>
         <p className="schedule-gantt__subtitle">
           {viewDate}
-          {todaySchedule?.project_ids.length
-            ? ` · 今日專案 ${todaySchedule.project_ids.join('、')}`
-            : ''}
+          {onSelectProject ? ' · 點選時段可查看對應素材' : ''}
         </p>
       </div>
 
@@ -69,24 +79,32 @@ export function ScheduleGantt({ projects, todaySchedule }: ScheduleGanttProps) {
           <div className="schedule-gantt__rows">
             {activeProjects.map((project) => {
               const barStyle = buildBarStyle(project);
+              const rowLabel = formatProjectRowLabel(project);
               const tooltip = [
                 formatDateRange(project.start_date, project.end_date),
                 formatDayOfWeeks(project.day_of_weeks),
                 project.is_interrupt ? '插播' : '一般',
                 formatTimeRange(project.start_time, project.end_time),
               ].join(' · ');
+              const isSelected = selectedProjectId === project.id;
 
               return (
-                <div key={project.id} className="schedule-gantt__row">
-                  <div className="schedule-gantt__label" title={tooltip}>
-                    <span className="schedule-gantt__label-id">#{project.id}</span>
-                    {project.layout_id != null ? (
-                      <span className="schedule-gantt__label-layout">L{project.layout_id}</span>
-                    ) : null}
+                <div
+                  key={project.id}
+                  className={`schedule-gantt__row${isSelected ? ' schedule-gantt__row--selected' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="schedule-gantt__label"
+                    title={tooltip}
+                    onClick={() => handleSelect(project.id)}
+                    aria-pressed={isSelected}
+                  >
+                    <span className="schedule-gantt__label-text">{rowLabel}</span>
                     {project.is_interrupt ? (
                       <span className="schedule-gantt__interrupt-badge">插播</span>
                     ) : null}
-                  </div>
+                  </button>
                   <div className="schedule-gantt__track">
                     {showNowLine ? (
                       <div
@@ -96,15 +114,18 @@ export function ScheduleGantt({ projects, todaySchedule }: ScheduleGanttProps) {
                         aria-hidden="true"
                       />
                     ) : null}
-                    <div
-                      className={`schedule-gantt__bar${project.is_interrupt ? ' schedule-gantt__bar--interrupt' : ''}`}
+                    <button
+                      type="button"
+                      className={`schedule-gantt__bar${project.is_interrupt ? ' schedule-gantt__bar--interrupt' : ''}${isSelected ? ' schedule-gantt__bar--selected' : ''}`}
                       style={barStyle}
                       title={tooltip}
+                      onClick={() => handleSelect(project.id)}
+                      aria-pressed={isSelected}
                     >
                       <span className="schedule-gantt__bar-time">
-                        {project.start_time.slice(0, 5)}–{project.end_time.slice(0, 5)}
+                        {formatTimeRange(project.start_time, project.end_time)}
                       </span>
-                    </div>
+                    </button>
                   </div>
                 </div>
               );

@@ -1,3 +1,5 @@
+import type { ProjectScheduleItem } from '../types/api-types';
+
 const WEEKDAY_LABELS: Record<string, string> = {
   '1': '一',
   '2': '二',
@@ -37,13 +39,41 @@ export function formatMediaType(type: string): string {
   return type || '—';
 }
 
+export function formatTimeShort(time: string): string {
+  const parts = time.trim().split(':');
+  if (parts.length < 2) {
+    return time.trim() || '—';
+  }
+  const hours = parts[0].padStart(2, '0');
+  const minutes = parts[1].padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 export function formatTimeRange(startTime: string, endTime: string): string {
-  const start = startTime.trim();
-  const end = endTime.trim();
-  if (!start && !end) {
+  const start = formatTimeShort(startTime);
+  const end = formatTimeShort(endTime);
+  if (start === '—' && end === '—') {
     return '—';
   }
-  return `${start || '—'} ~ ${end || '—'}`;
+  return `${start}–${end}`;
+}
+
+export function formatProjectLabel(project: ProjectScheduleItem): string {
+  const name = project.name?.trim();
+  if (name) {
+    return name;
+  }
+  return `專案 ${project.id}`;
+}
+
+export function formatProjectRowLabel(project: ProjectScheduleItem): string {
+  return `${formatProjectLabel(project)}｜${formatTimeRange(project.start_time, project.end_time)}`;
+}
+
+export function formatNowClock(date: Date = new Date()): string {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
 }
 
 export function formatDateRange(startDate: string, endDate: string): string {

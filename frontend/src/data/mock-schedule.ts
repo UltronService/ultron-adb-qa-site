@@ -6,6 +6,7 @@ const MOCK_SCHEDULE_BY_DEVICE: Record<string, ScheduleMediaResponse> = {
     projects: [
       {
         id: 1,
+        name: '信義店全日檔',
         layout_id: 10,
         start_date: '2026-01-01',
         end_date: '2026-12-31',
@@ -35,6 +36,10 @@ const MOCK_SCHEDULE_BY_DEVICE: Record<string, ScheduleMediaResponse> = {
         file_name: 'brand_logo.png',
       },
     ],
+    time_table: [
+      { project_id: 1, media_id: 201, sequence: 1 },
+      { project_id: 1, media_id: 202, sequence: 2 },
+    ],
     today_schedule: {
       date: '2026-09-15',
       project_ids: [1],
@@ -46,6 +51,7 @@ const MOCK_SCHEDULE_BY_DEVICE: Record<string, ScheduleMediaResponse> = {
     projects: [
       {
         id: 1,
+        name: '主檔全日播放',
         layout_id: 20,
         start_date: '2026-01-01',
         end_date: '2026-12-31',
@@ -56,6 +62,7 @@ const MOCK_SCHEDULE_BY_DEVICE: Record<string, ScheduleMediaResponse> = {
       },
       {
         id: 2,
+        name: '午間套餐插播',
         layout_id: 21,
         start_date: '2026-09-01',
         end_date: '2026-09-30',
@@ -66,6 +73,7 @@ const MOCK_SCHEDULE_BY_DEVICE: Record<string, ScheduleMediaResponse> = {
       },
       {
         id: 3,
+        name: '晚間活動檔',
         layout_id: 22,
         start_date: '2026-09-15',
         end_date: '2026-09-15',
@@ -104,6 +112,11 @@ const MOCK_SCHEDULE_BY_DEVICE: Record<string, ScheduleMediaResponse> = {
         file_name: 'https://promo.example.com/countdown',
       },
     ],
+    time_table: [
+      { project_id: 1, media_id: 301, sequence: 1 },
+      { project_id: 2, media_id: 302, sequence: 1 },
+      { project_id: 3, media_id: 303, sequence: 1 },
+    ],
     today_schedule: {
       date: '2026-09-15',
       project_ids: [1, 2, 3],
@@ -123,6 +136,7 @@ export function getMockScheduleMedia(deviceId: string): ScheduleMediaResponse {
     projects: [
       {
         id: 1,
+        name: '展示專案',
         layout_id: 1,
         start_date: '2026-01-01',
         end_date: '2026-12-31',
@@ -143,6 +157,7 @@ export function getMockScheduleMedia(deviceId: string): ScheduleMediaResponse {
         file_name: 'demo_asset.jpg',
       },
     ],
+    time_table: [{ project_id: 1, media_id: 1, sequence: 1 }],
     today_schedule: {
       date: '2026-09-15',
       project_ids: [1],

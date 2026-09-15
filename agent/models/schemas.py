@@ -135,6 +135,7 @@ class ScriptRunStatus(BaseModel):
 
 class ProjectScheduleItem(BaseModel):
     id: int
+    name: str = ""
     layout_id: int | None = None
     start_date: str = ""
     end_date: str = ""
@@ -142,6 +143,12 @@ class ProjectScheduleItem(BaseModel):
     end_time: str = ""
     day_of_weeks: str = ""
     is_interrupt: bool = False
+
+
+class TimeTableEntry(BaseModel):
+    project_id: int
+    media_id: int
+    sequence: int = 0
 
 
 class MediaScheduleItem(BaseModel):
@@ -163,6 +170,7 @@ class ScheduleMediaResponse(BaseModel):
     device_id: str
     projects: list[ProjectScheduleItem] = Field(default_factory=list)
     media: list[MediaScheduleItem] = Field(default_factory=list)
+    time_table: list[TimeTableEntry] = Field(default_factory=list)
     today_schedule: TodaySchedule | None = None
     mock: bool = False
     error: str = ""

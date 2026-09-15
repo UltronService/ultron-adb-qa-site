@@ -1,4 +1,9 @@
-import type { ProjectScheduleItem, TodaySchedule } from '../types/api-types';
+import type {
+  MediaScheduleItem,
+  ProjectScheduleItem,
+  TimeTableEntry,
+  TodaySchedule,
+} from '../types/api-types';
 
 const MINUTES_PER_DAY = 24 * 60;
 
@@ -86,3 +91,109 @@ export function isToday(dateStr: string): boolean {
 }
 
 export const GANTT_HOUR_MARKS = Array.from({ length: 25 }, (_, index) => index);
+
+export function getCurrentMinutes(date: Date = new Date()): number {
+  return date.getHours() * 60 + date.getMinutes() + date.getSeconds() / 60;
+}
+
+export function isTimeWithinRange(
+  minutes: number,
+  startTime: string,
+  endTime: string,
+): boolean {
+  const start = parseTimeToMinutes(startTime);
+  const end = parseTimeToMinutes(endTime);
+  if (end <= start) {
+    return minutes >= start || minutes < end;
+  }
+  return minutes >= start && minutes < end;
+}
+
+export function compareProjectsByStartTime(
+  left: ProjectScheduleItem,
+  right: ProjectScheduleItem,
+): number {
+  const startDiff = parseTimeToMinutes(left.start_time) - parseTimeToMinutes(right.start_time);
+  if (startDiff !== 0) {
+    return startDiff;
+  }
+  if (left.is_interrupt !== right.is_interrupt) {
+    return left.is_interrupt ? -1 : 1;
+  }
+  return left.id - right.id;
+}
+
+export function sortProjectsByStartTime(
+  projects: ProjectScheduleItem[],
+): ProjectScheduleItem[] {
+  return [...projects].sort(compareProjectsByStartTime);
+}
+
+export function findCurrentProject(
+  projects: ProjectScheduleItem[],
+  nowMinutes: number = getCurrentMinutes(),
+): ProjectScheduleItem | null {
+  const playing = projects.filter((project) =>
+    isTimeWithinRange(nowMinutes, project.start_time, project.end_time),
+  );
+  if (playing.length === 0) {
+    return null;
+  }
+  const interrupts = playing.filter((project) => project.is_interrupt);
+  if (interrupts.length > 0) {
+    return sortProjectsByStartTime(interrupts)[0];
+  }
+  return sortProjectsByStartTime(playing)[0];
+}
+
+export function findNextProject(
+  projects: ProjectScheduleItem[],
+  nowMinutes: number = getCurrentMinutes(),
+): ProjectScheduleItem | null {
+  const upcoming = projects.filter(
+    (project) => parseTimeToMinutes(project.start_time) > nowMinutes,
+  );
+  if (upcoming.length === 0) {
+    return null;
+  }
+  return sortProjectsByStartTime(upcoming)[0];
+}
+
+export function getDefaultSelectedProjectId(
+  projects: ProjectScheduleItem[],
+  nowMinutes: number = getCurrentMinutes(),
+): number | null {
+  const current = findCurrentProject(projects, nowMinutes);
+  if (current) {
+    return current.id;
+  }
+  const sorted = sortProjectsByStartTime(projects);
+  return sorted[0]?.id ?? null;
+}
+
+export function filterMediaForProject(
+  media: MediaScheduleItem[],
+  timeTable: TimeTableEntry[],
+  projectId: number,
+): MediaScheduleItem[] {
+  const entries = timeTable
+    .filter((entry) => entry.project_id === projectId)
+    .sort((left, right) => left.sequence - right.sequence);
+  if (entries.length === 0) {
+    return media;
+  }
+
+  const mediaById = new Map(media.map((item) => [item.id, item]));
+  const ordered = entries
+    .map((entry) => mediaById.get(entry.media_id))
+    .filter((item): item is MediaScheduleItem => item !== undefined);
+
+  return ordered.length > 0 ? ordered : media;
+}
+
+export function hasProjectMediaMapping(
+  timeTable: TimeTableEntry[],
+  projectId: number,
+): boolean {
+  return timeTable.some((entry) => entry.project_id === projectId);
+}

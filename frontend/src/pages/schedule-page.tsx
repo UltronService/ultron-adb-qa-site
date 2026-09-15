@@ -3,9 +3,16 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { fetchDevices } from '../api/device-api';
 import { fetchScheduleMedia } from '../api/schedule-api';
 import { ScheduleGantt } from '../components/schedule-gantt';
+import { ScheduleNowSummary } from '../components/schedule-now-summary';
 import { SchedulePlaylistStrip } from '../components/schedule-playlist-strip';
 import { Skeleton } from '../components/ui/skeleton';
 import { useDemoMode } from '../hooks/use-demo-mode';
+import {
+  filterActiveProjects,
+  filterMediaForProject,
+  getDefaultSelectedProjectId,
+  getViewDate,
+} from '../lib/schedule-utils';
 import type { DeviceInfo, ScheduleMediaResponse } from '../types/api-types';
 
 export function SchedulePage() {
@@ -13,6 +20,7 @@ export function SchedulePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [scheduleData, setScheduleData] = useState<ScheduleMediaResponse | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [loadingDevices, setLoadingDevices] = useState(true);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [error, setError] = useState('');
@@ -37,6 +45,7 @@ export function SchedulePage() {
   const loadSchedule = useCallback(async (deviceId: string) => {
     if (!deviceId) {
       setScheduleData(null);
+      setSelectedProjectId(null);
       setError('');
       return;
     }
@@ -48,6 +57,7 @@ export function SchedulePage() {
       setScheduleData(result);
     } catch (requestError) {
       setScheduleData(null);
+      setSelectedProjectId(null);
       setError(requestError instanceof Error ? requestError.message : '無法載入排程資料');
     } finally {
       setLoadingSchedule(false);
@@ -61,6 +71,44 @@ export function SchedulePage() {
   useEffect(() => {
     void loadSchedule(selectedDeviceId);
   }, [loadSchedule, selectedDeviceId]);
+
+  const activeProjects = useMemo(() => {
+    if (!scheduleData) {
+      return [];
+    }
+    const viewDate = getViewDate(scheduleData.today_schedule);
+    return filterActiveProjects(
+      scheduleData.projects,
+      viewDate,
+      scheduleData.today_schedule?.project_ids,
+    );
+  }, [scheduleData]);
+
+  const defaultProjectId = useMemo(
+    () => getDefaultSelectedProjectId(activeProjects),
+    [activeProjects],
+  );
+
+  useEffect(() => {
+    if (!scheduleData) {
+      return;
+    }
+    setSelectedProjectId(defaultProjectId);
+  }, [scheduleData?.device_id, defaultProjectId]);
+
+  const displayedMedia = useMemo(() => {
+    if (!scheduleData) {
+      return [];
+    }
+    if (selectedProjectId === null) {
+      return scheduleData.media;
+    }
+    return filterMediaForProject(
+      scheduleData.media,
+      scheduleData.time_table ?? [],
+      selectedProjectId,
+    );
+  }, [scheduleData, selectedProjectId]);
 
   const handleDeviceChange = (deviceId: string) => {
     if (!deviceId) {
@@ -95,7 +143,7 @@ export function SchedulePage() {
 
       <div className="schedule-hint panel">
         <strong>說明：</strong>
-        素材只有日期與播放秒數；幾點到幾點由專案時段決定。
+        素材只有日期與播放秒數；幾點到幾點由專案時段決定。點選甘特圖時段可篩選下方素材。
       </div>
 
       {!selectedDeviceId ? (
@@ -169,12 +217,25 @@ export function SchedulePage() {
                 <p className="schedule-mock-note">目前為展示模式資料（Agent 離線或裝置無法讀取時使用）。</p>
               ) : null}
 
-              <ScheduleGantt
+              <ScheduleNowSummary
                 projects={scheduleData.projects}
                 todaySchedule={scheduleData.today_schedule}
               />
 
-              <SchedulePlaylistStrip media={scheduleData.media} />
+              <ScheduleGantt
+                projects={scheduleData.projects}
+                todaySchedule={scheduleData.today_schedule}
+                selectedProjectId={selectedProjectId}
+                onSelectProject={setSelectedProjectId}
+              />
+
+              <SchedulePlaylistStrip
+                media={displayedMedia}
+                projects={scheduleData.projects}
+                timeTable={scheduleData.time_table}
+                selectedProjectId={selectedProjectId}
+                onClearSelection={() => setSelectedProjectId(null)}
+              />
             </>
           ) : null}
         </>

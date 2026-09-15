@@ -14,6 +14,7 @@ from models.schemas import (
     MediaScheduleItem,
     ProjectScheduleItem,
     ScheduleMediaResponse,
+    TimeTableEntry,
     TodaySchedule,
 )
 
@@ -29,6 +30,9 @@ ULTRON_PROJECTS_SQL = (
 )
 ULTRON_MEDIA_SQL = (
     "SELECT id, name, type, duration, startDate, endDate, param FROM media;"
+)
+ULTRON_TIME_TABLE_SQL = (
+    "SELECT projectId, mediaId, sequence FROM time_table ORDER BY projectId, sequence;"
 )
 ADB_SHELL_TIMEOUT_SEC = 8.0
 
@@ -453,9 +457,10 @@ class AdbService:
             return self._mock_schedule_media(normalized_id)
 
         try:
-            projects, media, today_schedule = await asyncio.gather(
+            projects, media, time_table, today_schedule = await asyncio.gather(
                 self._fetch_ultron_projects(normalized_id),
                 self._fetch_ultron_media(normalized_id),
+                self._fetch_ultron_time_table(normalized_id),
                 self._fetch_ultron_today_schedule(normalized_id),
             )
         except (OSError, NotImplementedError, RuntimeError) as error:
@@ -481,6 +486,7 @@ class AdbService:
             device_id=normalized_id,
             projects=projects,
             media=media,
+            time_table=time_table,
             today_schedule=today_schedule,
             mock=False,
         )
@@ -682,6 +688,21 @@ class AdbService:
             )
         return media_items
 
+    async def _fetch_ultron_time_table(self, device_id: str) -> list[TimeTableEntry]:
+        rows = await self._run_ultron_sql(device_id, ULTRON_TIME_TABLE_SQL)
+        entries: list[TimeTableEntry] = []
+        for parts in rows:
+            if len(parts) < 2:
+                continue
+            entries.append(
+                TimeTableEntry(
+                    project_id=self._parse_optional_int(parts[0]) or 0,
+                    media_id=self._parse_optional_int(parts[1]) or 0,
+                    sequence=self._parse_optional_int(parts[2]) if len(parts) > 2 else 0,
+                ),
+            )
+        return entries
+
     async def _fetch_ultron_today_schedule(self, device_id: str) -> TodaySchedule | None:
         today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
         sql = f"SELECT date, projectIds FROM schedule WHERE date = '{today}' LIMIT 1;"
@@ -703,6 +724,7 @@ class AdbService:
         projects = [
             ProjectScheduleItem(
                 id=1,
+                name=f"{label} 主檔",
                 layout_id=10,
                 start_date="2026-01-01",
                 end_date="2026-12-31",
@@ -713,6 +735,7 @@ class AdbService:
             ),
             ProjectScheduleItem(
                 id=2,
+                name="午間促銷插播",
                 layout_id=11,
                 start_date="2026-09-01",
                 end_date="2026-09-30",
@@ -751,11 +774,17 @@ class AdbService:
                 file_name="https://weather.example.com/widget",
             ),
         ]
+        time_table = [
+            TimeTableEntry(project_id=1, media_id=101, sequence=1),
+            TimeTableEntry(project_id=1, media_id=103, sequence=2),
+            TimeTableEntry(project_id=2, media_id=102, sequence=1),
+        ]
         today = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d")
         return ScheduleMediaResponse(
             device_id=device_id,
             projects=projects,
             media=media_items,
+            time_table=time_table,
             today_schedule=TodaySchedule(date=today, project_ids=[1, 2]),
             mock=True,
         )

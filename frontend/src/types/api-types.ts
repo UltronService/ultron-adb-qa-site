@@ -70,6 +70,7 @@ export interface ReportDiff {
 
 export interface ProjectScheduleItem {
   id: number;
+  name?: string;
   layout_id?: number | null;
   start_date: string;
   end_date: string;
@@ -77,6 +78,12 @@ export interface ProjectScheduleItem {
   end_time: string;
   day_of_weeks: string;
   is_interrupt: boolean;
+}
+
+export interface TimeTableEntry {
+  project_id: number;
+  media_id: number;
+  sequence: number;
 }
 
 export interface MediaScheduleItem {
@@ -98,6 +105,7 @@ export interface ScheduleMediaResponse {
   device_id: string;
   projects: ProjectScheduleItem[];
   media: MediaScheduleItem[];
+  time_table?: TimeTableEntry[];
   today_schedule?: TodaySchedule | null;
   mock?: boolean;
   error?: string;
