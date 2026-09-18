@@ -1,0 +1,869 @@
+diff --git a/README.md b/README.md
+index 46882f3..15cbcfa 100644
+--- a/README.md
++++ b/README.md
+@@ -11,6 +11,15 @@ Internal web console for testing APK builds on multiple Android set-top boxes vi
+ └── frontend/       # Vite + React + TypeScript SPA
+ ```
+ 
++## Office one-click (Windows)
++
++```powershell
++cd D:\Cursor\ultron-adb-qa-site
++.\scripts\office-update-and-start.ps1
++```
++
++Pulls branch `cursor/console-apk-zh-tw-c5d8` then opens **http://127.0.0.1:43123/console** (繁中主控台：APK 安裝/卸載、清除資料、錄影、時間設定、截圖、Logcat)。
++
+ ## Prerequisites
+ 
+ - Node.js 18+
+diff --git a/agent/routers/console.py b/agent/routers/console.py
+index a64f4dd..9c8d7e1 100644
+--- a/agent/routers/console.py
++++ b/agent/routers/console.py
+@@ -1,8 +1,10 @@
+ import base64
++import tempfile
+ from datetime import datetime, timezone
+ from pathlib import Path
+ 
+-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
++from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
++from fastapi.responses import Response
+ from pydantic import BaseModel, Field
+ 
+ from services.adb_service import AdbService
+@@ -39,6 +41,18 @@ class LaunchAppRequest(BaseModel):
+     activity: str = Field(default="com.ultron.player/.MainActivity")
+ 
+ 
++class PackageNameRequest(BaseModel):
++    package_name: str = Field(default="com.ultron.player")
++
++
++class ScreenRecordRequest(BaseModel):
++    duration_seconds: int = Field(default=30, ge=1, le=180)
++
++
++class SetDateTimeRequest(BaseModel):
++    datetime: str = Field(..., min_length=1)
++
++
+ @router.post("/{device_id}/screenshot")
+ async def capture_screenshot(device_id: str) -> dict[str, str]:
+     try:
+@@ -140,6 +154,115 @@ async def launch_app(device_id: str, payload: LaunchAppRequest) -> dict[str, str
+         raise HTTPException(status_code=500, detail=str(error)) from error
+ 
+ 
++@router.post("/{device_id}/clear-app")
++async def clear_app_data(device_id: str, payload: PackageNameRequest) -> dict[str, str]:
++    try:
++        await adb_service.clear_app_data(device_id, payload.package_name)
++        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
++    except ValueError as error:
++        raise HTTPException(status_code=400, detail=str(error)) from error
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
++@router.post("/{device_id}/uninstall")
++async def uninstall_app(device_id: str, payload: PackageNameRequest) -> dict[str, str]:
++    try:
++        await adb_service.uninstall_app(device_id, payload.package_name)
++        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
++    except ValueError as error:
++        raise HTTPException(status_code=400, detail=str(error)) from error
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
++@router.post("/{device_id}/install")
++async def install_app_on_device(
++    device_id: str,
++    replace: bool = Form(default=True),
++    allow_downgrade: bool = Form(default=False),
++    apk_file: UploadFile = File(...),
++) -> dict[str, str]:
++    if not apk_file.filename or not apk_file.filename.lower().endswith(".apk"):
++        raise HTTPException(status_code=400, detail="An .apk file is required.")
++
++    suffix = Path(apk_file.filename).suffix or ".apk"
++    temp_path: Path | None = None
++
++    try:
++        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
++            temp_path = Path(temp_file.name)
++            content = await apk_file.read()
++            temp_path.write_bytes(content)
++
++        await adb_service.install_apk(
++            device_id,
++            str(temp_path),
++            replace=replace,
++            allow_downgrade=allow_downgrade,
++        )
++    except ValueError as error:
++        raise HTTPException(status_code=400, detail=str(error)) from error
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++    finally:
++        if temp_path is not None:
++            temp_path.unlink(missing_ok=True)
++
++    return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
++
++
++@router.post("/{device_id}/screenrecord")
++async def capture_screen_record(device_id: str, payload: ScreenRecordRequest) -> Response:
++    try:
++        video_bytes = await adb_service.capture_screen_record(
++            device_id,
++            payload.duration_seconds,
++        )
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++    if not video_bytes:
++        raise HTTPException(status_code=503, detail="Screen recording unavailable (adb not found)")
++
++    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
++    safe_device = device_id.replace(":", "-")
++    filename = f"screenrecord-{safe_device}-{timestamp}.mp4"
++    return Response(
++        content=video_bytes,
++        media_type="video/mp4",
++        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
++    )
++
++
++@router.post("/{device_id}/datetime/set")
++async def set_device_datetime(device_id: str, payload: SetDateTimeRequest) -> dict[str, str]:
++    try:
++        message = await adb_service.set_device_datetime(device_id, payload.datetime)
++        return {
++            "status": "ok",
++            "message": message,
++            "mock": "false" if adb_service.adb_available else "true",
++        }
++    except ValueError as error:
++        raise HTTPException(status_code=400, detail=str(error)) from error
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
++@router.post("/{device_id}/datetime/restore-network")
++async def restore_network_time(device_id: str) -> dict[str, str]:
++    try:
++        message = await adb_service.restore_network_time(device_id)
++        return {
++            "status": "ok",
++            "message": message,
++            "mock": "false" if adb_service.adb_available else "true",
++        }
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
+ @router.get("/{device_id}/props")
+ async def get_device_props(device_id: str) -> dict[str, str | dict[str, str]]:
+     try:
+diff --git a/agent/services/adb_service.py b/agent/services/adb_service.py
+index 30f9158..d4a42d9 100644
+--- a/agent/services/adb_service.py
++++ b/agent/services/adb_service.py
+@@ -3,9 +3,12 @@ import re
+ import shutil
+ import subprocess
+ import sys
++import tempfile
++import time
+ from collections.abc import AsyncIterator
+ from dataclasses import asdict, dataclass
+ from datetime import datetime, timezone
++from pathlib import Path
+ 
+ from models.schemas import DeviceInfo
+ 
+@@ -16,6 +19,7 @@ ULTRON_LOGIN_SQL = (
+     "FROM login LIMIT 1;"
+ )
+ ADB_SHELL_TIMEOUT_SEC = 8.0
++SCREENRECORD_MAX_SECONDS = 180
+ 
+ LOG_LEVEL_MAP = {
+     "Verbose": "V",
+@@ -285,19 +289,183 @@ class AdbService:
+         if return_code != 0:
+             raise RuntimeError(stderr or "Text input failed")
+ 
+-    async def install_apk(self, device_id: str, apk_path: str) -> None:
++    async def install_apk(
++        self,
++        device_id: str,
++        apk_path: str,
++        *,
++        replace: bool = True,
++        allow_downgrade: bool = False,
++    ) -> None:
++        if not self.adb_available:
++            return
++
++        path = Path(apk_path)
++        if not path.is_file():
++            raise ValueError(f"APK file not found: {apk_path}")
++
++        install_args = ["-s", device_id, "install"]
++        if replace:
++            install_args.append("-r")
++        if allow_downgrade:
++            install_args.append("-d")
++        install_args.append(str(path))
++
++        return_code, stdout, stderr = await self._run_adb(
++            *install_args,
++            timeout_sec=300.0,
++        )
++        output = stdout or stderr
++        if return_code != 0 or "Success" not in output:
++            raise RuntimeError(output or "APK install failed")
++
++    async def uninstall_app(self, device_id: str, package_name: str) -> None:
+         if not self.adb_available:
+             return
+ 
++        normalized = package_name.strip()
++        if not normalized:
++            raise ValueError("Package name is required")
++
++        return_code, stdout, stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "uninstall",
++            normalized,
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        )
++        output = stdout or stderr
++        if return_code != 0 or "Success" not in output:
++            raise RuntimeError(output or "App uninstall failed")
++
++    async def clear_app_data(self, device_id: str, package_name: str) -> None:
++        if not self.adb_available:
++            return
++
++        normalized = package_name.strip()
++        if not normalized:
++            raise ValueError("Package name is required")
++
++        return_code, stdout, stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "shell",
++            "pm",
++            "clear",
++            normalized,
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        )
++        output = stdout or stderr
++        if return_code != 0 or "Success" not in output:
++            raise RuntimeError(output or "Failed to clear app data")
++
++    async def capture_screen_record(self, device_id: str, duration_seconds: int) -> bytes:
++        if not self.adb_available:
++            return b""
++
++        bounded_duration = min(max(duration_seconds, 1), SCREENRECORD_MAX_SECONDS)
++        remote_path = f"/sdcard/ultron-rec-{int(time.time())}.mp4"
++        record_timeout = float(bounded_duration + 15)
++
+         return_code, _stdout, stderr = await self._run_adb(
+             "-s",
+             device_id,
+-            "install",
+-            "-r",
+-            apk_path,
++            "shell",
++            "screenrecord",
++            "--time-limit",
++            str(bounded_duration),
++            remote_path,
++            timeout_sec=record_timeout,
++        )
++        if return_code != 0:
++            raise RuntimeError(stderr or "Screen recording failed")
++
++        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
++            local_path = Path(temp_file.name)
++
++        try:
++            return_code, _stdout, stderr = await self._run_adb(
++                "-s",
++                device_id,
++                "pull",
++                remote_path,
++                str(local_path),
++                timeout_sec=record_timeout,
++            )
++            if return_code != 0:
++                raise RuntimeError(stderr or "Screen recording pull failed")
++
++            video_bytes = local_path.read_bytes()
++            if not video_bytes:
++                raise RuntimeError("Screen recording returned empty data")
++            return video_bytes
++        finally:
++            local_path.unlink(missing_ok=True)
++            await self._run_adb(
++                "-s",
++                device_id,
++                "shell",
++                "rm",
++                "-f",
++                remote_path,
++                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++            )
++
++    @staticmethod
++    def _format_datetime_for_adb(iso_datetime: str) -> str:
++        normalized = iso_datetime.strip()
++        try:
++            parsed = datetime.fromisoformat(normalized)
++        except ValueError as error:
++            raise ValueError(
++                "datetime must be ISO format, e.g. 2026-09-18T14:30:00",
++            ) from error
++        return parsed.strftime("%Y-%m-%d %H:%M:%S")
++
++    async def set_device_datetime(self, device_id: str, iso_datetime: str) -> str:
++        if not self.adb_available:
++            return ""
++
++        formatted = self._format_datetime_for_adb(iso_datetime)
++        return_code, stdout, stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "shell",
++            "date",
++            "-s",
++            formatted,
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+         )
+         if return_code != 0:
+-            raise RuntimeError(stderr or "APK install failed")
++            raise RuntimeError(stderr or stdout or "Failed to set device datetime")
++        return stdout.strip() or f"Device time set to {formatted}"
++
++    async def restore_network_time(self, device_id: str) -> str:
++        if not self.adb_available:
++            return ""
++
++        for args in (
++            ("settings", "put", "global", "auto_time", "1"),
++            ("settings", "put", "global", "auto_time_zone", "1"),
++        ):
++            return_code, _stdout, stderr = await self._run_adb(
++                "-s",
++                device_id,
++                "shell",
++                *args,
++                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++            )
++            if return_code != 0:
++                raise RuntimeError(stderr or "Failed to restore network time")
++
++        return_code, stdout, _stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "shell",
++            "date",
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        )
++        return stdout.strip() or "Network time sync enabled (auto_time=1, auto_time_zone=1)"
+ 
+     async def resolve_package_pid(self, device_id: str, package_name: str) -> str | None:
+         if not self.adb_available or not package_name:
+diff --git a/docs/office-console-update-zh-tw.md b/docs/office-console-update-zh-tw.md
+new file mode 100644
+index 0000000..f11c16d
+--- /dev/null
++++ b/docs/office-console-update-zh-tw.md
+@@ -0,0 +1,48 @@
++# 辦公室更新 — 繁中主控台（APK / 錄影 / 時間）
++
++## 一鍵更新
++
++在 **PowerShell** 於 repo 根目錄執行：
++
++```powershell
++cd D:\Cursor\ultron-adb-qa-site
++.\scripts\office-update-and-start.ps1
++```
++
++腳本會：
++
++1. 加入 `admin-ultron` remote（若尚未存在）
++2. 拉取分支 `cursor/console-apk-zh-tw-c5d8`
++3. 安裝 frontend 依賴
++4. 啟動 Agent（8765）+ Frontend（43123）
++
++## 確認更新成功
++
++開啟 http://127.0.0.1:43123/console ，左側應看到：
++
++- **App 安裝 / 卸載 / 啟動**（含覆蓋安裝、允許降版）
++- **STB 日期與時間**
++- 即時預覽區有 **錄影 30 秒**
++
++頁面標題應為 **互動主控台**（非 Interactive Console）。
++
++## 手動更新（腳本失敗時）
++
++```powershell
++cd D:\Cursor\ultron-adb-qa-site
++git remote add admin-ultron https://github.com/admin-ultron/ultron-adb-qa-site.git
++git fetch admin-ultron cursor/console-apk-zh-tw-c5d8
++git checkout -B cursor/console-apk-zh-tw-c5d8 admin-ultron/cursor/console-apk-zh-tw-c5d8
++cd frontend
++npm install
++cd ..
++.\scripts\local-start.ps1
++```
++
++## 常見問題
++
++| 現象 | 原因 | 解法 |
++|------|------|------|
++| 仍是舊版繁中 UI | 沒拉到新分支 | 重跑 `office-update-and-start.ps1` |
++| 變成英文 Interactive Console | 誤 checkout 到 main | 重新 checkout 上方分支 |
++| Agent 離線 | PowerShell 視窗被關閉 | 重跑 `local-start.ps1` |
+diff --git a/frontend/src/api/console-api.ts b/frontend/src/api/console-api.ts
+index e76bf0c..32dee89 100644
+--- a/frontend/src/api/console-api.ts
++++ b/frontend/src/api/console-api.ts
+@@ -5,7 +5,7 @@ import type {
+   DevicePropsResponse,
+   ShellCommandResponse,
+ } from '../types/console-adb-types';
+-import { agentRequest, getAgentWebSocketBase } from './agent-client';
++import { agentRequest, getAgentBaseUrl, getAgentWebSocketBase } from './agent-client';
+ 
+ interface ScreenshotResponse {
+   image_base64: string;
+@@ -134,3 +134,74 @@ export async function launchApp(
+ export async function fetchDeviceProps(deviceId: string): Promise<DevicePropsResponse> {
+   return agentRequest<DevicePropsResponse>(`/api/console/${deviceId}/props`);
+ }
++
++export async function clearAppData(
++  deviceId: string,
++  packageName: string,
++): Promise<AdbActionResponse> {
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/clear-app`, {
++    method: 'POST',
++    body: JSON.stringify({ package_name: packageName }),
++  });
++}
++
++export async function uninstallApp(
++  deviceId: string,
++  packageName: string,
++): Promise<AdbActionResponse> {
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/uninstall`, {
++    method: 'POST',
++    body: JSON.stringify({ package_name: packageName }),
++  });
++}
++
++export async function installApkOnDevice(
++  deviceId: string,
++  file: File,
++  options: { replace: boolean; allowDowngrade: boolean },
++): Promise<AdbActionResponse> {
++  const formData = new FormData();
++  formData.append('apk_file', file);
++  formData.append('replace', String(options.replace));
++  formData.append('allow_downgrade', String(options.allowDowngrade));
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/install`, {
++    method: 'POST',
++    body: formData,
++    parseJson: true,
++  });
++}
++
++export async function captureScreenRecord(
++  deviceId: string,
++  durationSeconds: number,
++): Promise<Blob> {
++  const response = await fetch(
++    `${getAgentBaseUrl()}/api/console/${deviceId}/screenrecord`,
++    {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify({ duration_seconds: durationSeconds }),
++    },
++  );
++  if (!response.ok) {
++    const detail = await response.text();
++    throw new Error(detail || 'Screen recording failed');
++  }
++  return response.blob();
++}
++
++export async function setDeviceDatetime(
++  deviceId: string,
++  datetime: string,
++): Promise<AdbActionResponse> {
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/datetime/set`, {
++    method: 'POST',
++    body: JSON.stringify({ datetime }),
++  });
++}
++
++export async function restoreNetworkTime(deviceId: string): Promise<AdbActionResponse> {
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/datetime/restore-network`, {
++    method: 'POST',
++  });
++}
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index a7722a4..36b3e57 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -78,6 +78,10 @@ a { color: inherit; text-decoration: none; }
+ .console-adb-tools { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #243041; display: flex; flex-direction: column; gap: 0.75rem; }
+ .console-adb-tools h3 { margin: 0; font-size: 0.95rem; }
+ .console-adb-tools__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
++.console-adb-section { display: flex; flex-direction: column; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #243041; }
++.console-adb-section h3 { margin: 0; font-size: 0.95rem; }
++.console-adb-checks { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; }
++.console-adb-check { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+ .console-adb-props h3 { margin: 0; font-size: 0.95rem; }
+ .console-adb-props .panel-header-row { margin-bottom: 0.5rem; }
+ .meta-list--compact { gap: 0.35rem; font-size: 0.85rem; }
+diff --git a/frontend/src/pages/console-page.tsx b/frontend/src/pages/console-page.tsx
+index 160b8ae..6a051c2 100644
+--- a/frontend/src/pages/console-page.tsx
++++ b/frontend/src/pages/console-page.tsx
+@@ -1,16 +1,22 @@
+ import { useCallback, useEffect, useMemo, useState } from 'react';
+ import {
++  captureScreenRecord,
+   captureScreenshot,
++  clearAppData,
+   exportLogcat,
+   fetchDeviceProps,
+   forceStopApp,
+   getMockLogcatLines,
++  installApkOnDevice,
+   launchApp,
+   openLogcatStream,
+   rebootDevice,
++  restoreNetworkTime,
+   runShellCommand,
+   sendKeyEvent,
+   sendTextInput,
++  setDeviceDatetime as setDeviceDatetimeOnDevice,
++  uninstallApp,
+ } from '../api/console-api';
+ import { Modal } from '../components/ui/modal';
+ import { MOCK_SCREENSHOT_DATA_URL } from '../data/mock-screenshot';
+@@ -64,6 +70,11 @@ export function ConsolePage() {
+   const [shellOutput, setShellOutput] = useState('');
+   const [deviceProps, setDeviceProps] = useState<DeviceProps>(EMPTY_DEVICE_PROPS);
+   const [propsLoading, setPropsLoading] = useState(false);
++  const [apkFile, setApkFile] = useState<File | null>(null);
++  const [installReplace, setInstallReplace] = useState(true);
++  const [installAllowDowngrade, setInstallAllowDowngrade] = useState(false);
++  const [deviceDatetime, setDeviceDatetime] = useState('');
++  const [recording, setRecording] = useState(false);
+ 
+   useEffect(() => {
+     const load = async () => {
+@@ -271,6 +282,84 @@ export function ConsolePage() {
+     }
+   };
+ 
++  const handleInstallApk = async () => {
++    if (!selectedDevice || !apkFile) {
++      showToast('請先選擇 APK 檔案', 'error');
++      return;
++    }
++    await runAdbAction('APK 安裝', () =>
++      installApkOnDevice(selectedDevice, apkFile, {
++        replace: installReplace,
++        allowDowngrade: installAllowDowngrade,
++      }),
++    );
++  };
++
++  const handleUninstallApp = async () => {
++    if (!selectedDevice) {
++      return;
++    }
++    if (!window.confirm(`確定要卸載 ${ULTRON_PLAYER_APK_SOURCE.packageName} 嗎？`)) {
++      return;
++    }
++    await runAdbAction('App 卸載', () =>
++      uninstallApp(selectedDevice, ULTRON_PLAYER_APK_SOURCE.packageName),
++    );
++  };
++
++  const handleClearAppData = async () => {
++    if (!selectedDevice) {
++      return;
++    }
++    if (!window.confirm('確定要清除 App 資料與快取嗎？')) {
++      return;
++    }
++    await runAdbAction('清除資料', () =>
++      clearAppData(selectedDevice, ULTRON_PLAYER_APK_SOURCE.packageName),
++    );
++  };
++
++  const handleScreenRecord = async () => {
++    if (!selectedDevice || recording) {
++      return;
++    }
++    setRecording(true);
++    try {
++      const blob = await captureScreenRecord(selectedDevice, 30);
++      const url = URL.createObjectURL(blob);
++      const anchor = document.createElement('a');
++      anchor.href = url;
++      anchor.download = `screenrecord-${selectedDevice.replace(':', '-')}.mp4`;
++      anchor.click();
++      URL.revokeObjectURL(url);
++      showToast('錄影已下載（30 秒）', 'success');
++    } catch (requestError) {
++      showToast(
++        requestError instanceof Error ? requestError.message : '錄影失敗',
++        'error',
++      );
++    } finally {
++      setRecording(false);
++    }
++  };
++
++  const handleSetDatetime = async () => {
++    if (!selectedDevice || !deviceDatetime) {
++      showToast('請選擇日期時間', 'error');
++      return;
++    }
++    await runAdbAction('設定時間', () =>
++      setDeviceDatetimeOnDevice(selectedDevice, deviceDatetime),
++    );
++  };
++
++  const handleRestoreNetworkTime = async () => {
++    if (!selectedDevice) {
++      return;
++    }
++    await runAdbAction('恢復網路時間', () => restoreNetworkTime(selectedDevice));
++  };
++
+   const handleCapture = async () => {
+     if (!selectedDevice) {
+       return;
+@@ -368,6 +457,79 @@ export function ConsolePage() {
+               </button>
+             </div>
+ 
++            <div className="console-adb-section">
++              <h3>App 安裝 / 卸載 / 啟動</h3>
++              <div className="field-group">
++                <label htmlFor="console-apk-file">APK 檔案</label>
++                <input
++                  id="console-apk-file"
++                  className="input"
++                  type="file"
++                  accept=".apk,application/vnd.android.package-archive"
++                  onChange={(event) => setApkFile(event.target.files?.[0] ?? null)}
++                />
++              </div>
++              <div className="console-adb-checks">
++                <label className="console-adb-check">
++                  <input
++                    type="checkbox"
++                    checked={installReplace}
++                    onChange={(event) => setInstallReplace(event.target.checked)}
++                  />
++                  覆蓋安裝 (-r)
++                </label>
++                <label className="console-adb-check">
++                  <input
++                    type="checkbox"
++                    checked={installAllowDowngrade}
++                    onChange={(event) => setInstallAllowDowngrade(event.target.checked)}
++                  />
++                  允許降版 (-d)
++                </label>
++              </div>
++              <div className="console-adb-tools__grid">
++                <button
++                  type="button"
++                  className="btn btn--primary"
++                  disabled={!apkFile}
++                  onClick={() => void handleInstallApk()}
++                >
++                  安裝 APK
++                </button>
++                <button type="button" className="btn btn--secondary" onClick={() => void handleLaunchApp()}>
++                  啟動 App
++                </button>
++                <button type="button" className="btn btn--ghost" onClick={() => void handleUninstallApp()}>
++                  卸載 App
++                </button>
++                <button type="button" className="btn btn--ghost" onClick={() => void handleClearAppData()}>
++                  清除資料與快取
++                </button>
++              </div>
++            </div>
++
++            <div className="console-adb-section">
++              <h3>STB 日期與時間</h3>
++              <div className="field-group">
++                <label htmlFor="console-datetime">設定裝置時間</label>
++                <input
++                  id="console-datetime"
++                  className="input"
++                  type="datetime-local"
++                  value={deviceDatetime}
++                  onChange={(event) => setDeviceDatetime(event.target.value)}
++                />
++              </div>
++              <div className="console-adb-tools__grid">
++                <button type="button" className="btn btn--secondary" onClick={() => void handleSetDatetime()}>
++                  設定時間
++                </button>
++                <button type="button" className="btn btn--ghost" onClick={() => void handleRestoreNetworkTime()}>
++                  恢復網路時間
++                </button>
++              </div>
++            </div>
++
+             <div className="field-group">
+               <label htmlFor="adb-shell">Shell 指令</label>
+               <div className="inline-field inline-field--stack">
+@@ -419,6 +581,14 @@ export function ConsolePage() {
+               <button type="button" className="btn btn--secondary" onClick={() => void handleCapture()}>
+                 立即截圖
+               </button>
++              <button
++                type="button"
++                className="btn btn--secondary"
++                disabled={recording}
++                onClick={() => void handleScreenRecord()}
++              >
++                {recording ? '錄影中…' : '錄影 30 秒'}
++              </button>
+               <button type="button" className="btn btn--ghost" onClick={() => setPreviewOpen(true)}>
+                 全螢幕
+               </button>
+diff --git a/frontend/src/types/console-adb-types.ts b/frontend/src/types/console-adb-types.ts
+index 5a53fb5..80d2d5d 100644
+--- a/frontend/src/types/console-adb-types.ts
++++ b/frontend/src/types/console-adb-types.ts
+@@ -20,4 +20,10 @@ export interface ShellCommandResponse {
+ export interface AdbActionResponse {
+   status: string;
+   mock: string;
++  message?: string;
++}
++
++export interface InstallApkOptions {
++  replace: boolean;
++  allowDowngrade: boolean;
+ }
+diff --git a/scripts/office-update-and-start.ps1 b/scripts/office-update-and-start.ps1
+new file mode 100644
+index 0000000..d8c7f96
+--- /dev/null
++++ b/scripts/office-update-and-start.ps1
+@@ -0,0 +1,87 @@
++# Ultron ADB QA Site — pull zh-TW console branch and start (Windows office)
++# Run from repo root: .\scripts\office-update-and-start.ps1
++
++$ErrorActionPreference = "Stop"
++$RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
++$Branch = "cursor/console-apk-zh-tw-c5d8"
++$AdminUltronUrl = "https://github.com/admin-ultron/ultron-adb-qa-site.git"
++
++Set-Location $RepoRoot
++
++Write-Host ""
++Write-Host "=== Ultron ADB QA — 更新繁中主控台 ===" -ForegroundColor Cyan
++Write-Host "目標分支: $Branch" -ForegroundColor Gray
++Write-Host "Repo: $RepoRoot" -ForegroundColor Gray
++Write-Host ""
++
++function Test-RemoteBranch {
++    param([string]$Remote, [string]$BranchName)
++    git ls-remote --heads $Remote $BranchName 2>$null | Out-Null
++    return $LASTEXITCODE -eq 0
++}
++
++$remotes = @(git remote)
++if ($remotes -notcontains "admin-ultron") {
++    Write-Host "加入 admin-ultron remote（繁中主控台分支來源）..." -ForegroundColor Yellow
++    git remote add admin-ultron $AdminUltronUrl
++    $remotes = @(git remote)
++}
++
++$fetchRemote = $null
++foreach ($candidate in @("admin-ultron", "origin", "github")) {
++    if ($remotes -contains $candidate) {
++        if (Test-RemoteBranch -Remote $candidate -BranchName $Branch) {
++            $fetchRemote = $candidate
++            break
++        }
++    }
++}
++
++if (-not $fetchRemote) {
++    Write-Host "ERROR: 找不到分支 $Branch" -ForegroundColor Red
++    Write-Host "請確認網路正常，或手動執行：" -ForegroundColor Yellow
++    Write-Host "  git fetch admin-ultron $Branch" -ForegroundColor Gray
++    exit 1
++}
++
++Write-Host "從 $fetchRemote 拉取 $Branch ..." -ForegroundColor Yellow
++git fetch $fetchRemote $Branch
++
++$currentBranch = git branch --show-current
++if ($currentBranch -ne $Branch) {
++    git checkout $Branch 2>$null
++    if ($LASTEXITCODE -ne 0) {
++        git checkout -b $Branch "$fetchRemote/$Branch"
++    }
++}
++
++git reset --hard "$fetchRemote/$Branch"
++
++Write-Host ""
++Write-Host "目前 commit: $(git log --oneline -1)" -ForegroundColor Green
++
++$consolePage = Join-Path $RepoRoot "frontend\src\pages\console-page.tsx"
++if (Test-Path $consolePage) {
++    $content = Get-Content $consolePage -Raw
++    if ($content -match "互動主控台" -and $content -match "App 安裝") {
++        Write-Host "UI 版本: 繁中主控台（含 APK / 錄影 / 時間設定）" -ForegroundColor Green
++    } elseif ($content -match "互動主控台") {
++        Write-Host "UI 版本: 繁中主控台（舊版，缺少 APK 區塊）" -ForegroundColor Yellow
++    } elseif ($content -match "Interactive Console") {
++        Write-Host "UI 版本: 英文版（admin-ultron main）— 非預期！" -ForegroundColor Red
++        Write-Host "請確認分支是否正確。" -ForegroundColor Red
++    }
++}
++
++Write-Host ""
++Write-Host "安裝 frontend 依賴..." -ForegroundColor Yellow
++Push-Location (Join-Path $RepoRoot "frontend")
++npm install
++Pop-Location
++
++Write-Host ""
++Write-Host "啟動 Agent + Frontend..." -ForegroundColor Yellow
++Write-Host "完成後開啟: http://127.0.0.1:43123/console" -ForegroundColor Cyan
++Write-Host ""
++
++& (Join-Path $RepoRoot "scripts\local-start.ps1")

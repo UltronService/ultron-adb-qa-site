@@ -1,0 +1,546 @@
+diff --git a/agent/routers/console.py b/agent/routers/console.py
+index 1f62e55..a64f4dd 100644
+--- a/agent/routers/console.py
++++ b/agent/routers/console.py
+@@ -26,6 +26,19 @@ class LogcatExportRequest(BaseModel):
+     max_lines: int = Field(default=2000, ge=100, le=10000)
+ 
+ 
++class ShellCommandRequest(BaseModel):
++    command: str = Field(..., min_length=1, max_length=500)
++
++
++class ForceStopRequest(BaseModel):
++    package_name: str = Field(..., min_length=1)
++
++
++class LaunchAppRequest(BaseModel):
++    package_name: str = Field(default="com.ultron.player")
++    activity: str = Field(default="com.ultron.player/.MainActivity")
++
++
+ @router.post("/{device_id}/screenshot")
+ async def capture_screenshot(device_id: str) -> dict[str, str]:
+     try:
+@@ -85,6 +98,60 @@ async def export_logcat(device_id: str, payload: LogcatExportRequest) -> dict[st
+     }
+ 
+ 
++@router.post("/{device_id}/shell")
++async def run_shell(device_id: str, payload: ShellCommandRequest) -> dict[str, str]:
++    try:
++        output = await adb_service.run_shell(device_id, payload.command)
++        return {"output": output, "mock": "false" if adb_service.adb_available else "true"}
++    except ValueError as error:
++        raise HTTPException(status_code=400, detail=str(error)) from error
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
++@router.post("/{device_id}/reboot")
++async def reboot_device(device_id: str) -> dict[str, str]:
++    try:
++        await adb_service.reboot_device(device_id)
++        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
++@router.post("/{device_id}/force-stop")
++async def force_stop_app(device_id: str, payload: ForceStopRequest) -> dict[str, str]:
++    try:
++        await adb_service.force_stop_app(device_id, payload.package_name)
++        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
++@router.post("/{device_id}/launch-app")
++async def launch_app(device_id: str, payload: LaunchAppRequest) -> dict[str, str]:
++    try:
++        await adb_service.launch_app(
++            device_id,
++            payload.package_name,
++            payload.activity,
++        )
++        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
++@router.get("/{device_id}/props")
++async def get_device_props(device_id: str) -> dict[str, str | dict[str, str]]:
++    try:
++        props = await adb_service.get_device_props(device_id)
++        return {
++            "props": props,
++            "mock": "false" if adb_service.adb_available else "true",
++        }
++    except RuntimeError as error:
++        raise HTTPException(status_code=500, detail=str(error)) from error
++
++
+ @router.websocket("/{device_id}/logcat")
+ async def stream_logcat(
+     websocket: WebSocket,
+diff --git a/agent/services/adb_service.py b/agent/services/adb_service.py
+index 36ccc35..30f9158 100644
+--- a/agent/services/adb_service.py
++++ b/agent/services/adb_service.py
+@@ -430,6 +430,103 @@ class AdbService:
+         if return_code != 0:
+             raise RuntimeError(stderr or "Activity launch failed")
+ 
++    async def launch_app(
++        self,
++        device_id: str,
++        package_name: str,
++        activity: str = "",
++    ) -> None:
++        if not self.adb_available:
++            return
++
++        if activity:
++            component = activity if "/" in activity else f"{package_name}/{activity}"
++            await self.launch_activity(device_id, component)
++            return
++
++        return_code, _stdout, stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "shell",
++            "monkey",
++            "-p",
++            package_name,
++            "-c",
++            "android.intent.category.LAUNCHER",
++            "1",
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        )
++        if return_code != 0:
++            raise RuntimeError(stderr or "App launch failed")
++
++    async def force_stop_app(self, device_id: str, package_name: str) -> None:
++        if not self.adb_available:
++            return
++
++        return_code, _stdout, stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "shell",
++            "am",
++            "force-stop",
++            package_name,
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        )
++        if return_code != 0:
++            raise RuntimeError(stderr or "Force stop failed")
++
++    async def reboot_device(self, device_id: str) -> None:
++        if not self.adb_available:
++            return
++
++        return_code, _stdout, stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "reboot",
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        )
++        if return_code != 0:
++            raise RuntimeError(stderr or "Reboot failed")
++
++    async def run_shell(self, device_id: str, command: str) -> str:
++        if not self.adb_available:
++            return ""
++
++        normalized = command.strip()
++        if not normalized:
++            raise ValueError("Shell command is required")
++
++        return_code, stdout, stderr = await self._run_adb(
++            "-s",
++            device_id,
++            "shell",
++            normalized,
++            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        )
++        if return_code != 0:
++            raise RuntimeError(stderr or stdout or "Shell command failed")
++
++        return stdout.strip()
++
++    async def get_device_props(self, device_id: str) -> dict[str, str]:
++        if not self.adb_available:
++            return {}
++
++        prop_keys = {
++            "product_brand": "ro.product.brand",
++            "product_manufacturer": "ro.product.manufacturer",
++            "product_model": "ro.product.model",
++            "android_version": "ro.build.version.release",
++            "serial": "ro.serialno",
++            "sdk_version": "ro.build.version.sdk",
++        }
++        tasks = [self._fetch_getprop_value(device_id, key) for key in prop_keys.values()]
++        values = await asyncio.gather(*tasks)
++        return {
++            field: value
++            for field, value in zip(prop_keys.keys(), values, strict=True)
++        }
++
+     async def _enrich_device(self, device: DeviceInfo) -> DeviceInfo:
+         if not device.online or not self.adb_available:
+             return device
+diff --git a/frontend/src/api/console-api.ts b/frontend/src/api/console-api.ts
+index 1ddb7ce..e76bf0c 100644
+--- a/frontend/src/api/console-api.ts
++++ b/frontend/src/api/console-api.ts
+@@ -1,5 +1,10 @@
+ import { MOCK_LOGCAT_LINES } from '../data/mock-logcat';
+ import { mockCaptureScreenshot, mockExportLogcat } from '../lib/mock-api';
++import type {
++  AdbActionResponse,
++  DevicePropsResponse,
++  ShellCommandResponse,
++} from '../types/console-adb-types';
+ import { agentRequest, getAgentWebSocketBase } from './agent-client';
+ 
+ interface ScreenshotResponse {
+@@ -88,3 +93,44 @@ export async function exportLogcat(
+     return mockExportLogcat(packageName, logLevel);
+   }
+ }
++
++export async function runShellCommand(
++  deviceId: string,
++  command: string,
++): Promise<ShellCommandResponse> {
++  return agentRequest<ShellCommandResponse>(`/api/console/${deviceId}/shell`, {
++    method: 'POST',
++    body: JSON.stringify({ command }),
++  });
++}
++
++export async function rebootDevice(deviceId: string): Promise<AdbActionResponse> {
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/reboot`, {
++    method: 'POST',
++  });
++}
++
++export async function forceStopApp(
++  deviceId: string,
++  packageName: string,
++): Promise<AdbActionResponse> {
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/force-stop`, {
++    method: 'POST',
++    body: JSON.stringify({ package_name: packageName }),
++  });
++}
++
++export async function launchApp(
++  deviceId: string,
++  packageName: string,
++  activity: string,
++): Promise<AdbActionResponse> {
++  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/launch-app`, {
++    method: 'POST',
++    body: JSON.stringify({ package_name: packageName, activity }),
++  });
++}
++
++export async function fetchDeviceProps(deviceId: string): Promise<DevicePropsResponse> {
++  return agentRequest<DevicePropsResponse>(`/api/console/${deviceId}/props`);
++}
+diff --git a/frontend/src/index.css b/frontend/src/index.css
+index 9378371..a7722a4 100644
+--- a/frontend/src/index.css
++++ b/frontend/src/index.css
+@@ -73,8 +73,17 @@ a { color: inherit; text-decoration: none; }
+ .panel-header-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.75rem; align-items: center; }
+ .panel h2, .panel h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+ 
+-.console-grid { display: grid; grid-template-columns: 220px 1fr 320px; gap: 1rem; }
++.console-grid { display: grid; grid-template-columns: minmax(260px, 300px) 1fr minmax(320px, 380px); gap: 1rem; align-items: start; }
+ @media (max-width: 1100px) { .console-grid { grid-template-columns: 1fr; } }
++.console-adb-tools { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #243041; display: flex; flex-direction: column; gap: 0.75rem; }
++.console-adb-tools h3 { margin: 0; font-size: 0.95rem; }
++.console-adb-tools__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
++.console-adb-props h3 { margin: 0; font-size: 0.95rem; }
++.console-adb-props .panel-header-row { margin-bottom: 0.5rem; }
++.meta-list--compact { gap: 0.35rem; font-size: 0.85rem; }
++.shell-output { margin: 0.5rem 0 0; padding: 0.5rem; background: #0f141b; border: 1px solid #243041; border-radius: 0.45rem; font-size: 0.75rem; max-height: 6rem; overflow: auto; white-space: pre-wrap; word-break: break-all; }
++.inline-field--stack { flex-direction: column; align-items: stretch; }
++.inline-field--stack .btn { width: 100%; }
+ 
+ .remote-pad { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; margin-bottom: 0.75rem; }
+ .remote-row { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+diff --git a/frontend/src/pages/console-page.tsx b/frontend/src/pages/console-page.tsx
+index 6251e09..160b8ae 100644
+--- a/frontend/src/pages/console-page.tsx
++++ b/frontend/src/pages/console-page.tsx
+@@ -1,9 +1,14 @@
+-import { useEffect, useMemo, useState } from 'react';
++import { useCallback, useEffect, useMemo, useState } from 'react';
+ import {
+   captureScreenshot,
+   exportLogcat,
++  fetchDeviceProps,
++  forceStopApp,
+   getMockLogcatLines,
++  launchApp,
+   openLogcatStream,
++  rebootDevice,
++  runShellCommand,
+   sendKeyEvent,
+   sendTextInput,
+ } from '../api/console-api';
+@@ -13,6 +18,7 @@ import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
+ import { fetchDevices } from '../api/device-api';
+ import { useDemoMode } from '../hooks/use-demo-mode';
+ import { useToast } from '../hooks/use-toast';
++import type { DeviceProps } from '../types/console-adb-types';
+ import type { DeviceInfo } from '../types/api-types';
+ 
+ import { LOG_LEVEL_OPTIONS, type LogLevel } from '../lib/ui-labels';
+@@ -26,6 +32,18 @@ const KEY_MAP: Record<string, string> = {
+   back: '4',
+   home: '3',
+   menu: '82',
++  volUp: '24',
++  volDown: '25',
++  power: '26',
++};
++
++const EMPTY_DEVICE_PROPS: DeviceProps = {
++  product_brand: '',
++  product_manufacturer: '',
++  product_model: '',
++  android_version: '',
++  serial: '',
++  sdk_version: '',
+ };
+ 
+ export function ConsolePage() {
+@@ -42,6 +60,10 @@ export function ConsolePage() {
+   const [previewUrl, setPreviewUrl] = useState(MOCK_SCREENSHOT_DATA_URL);
+   const [previewOpen, setPreviewOpen] = useState(false);
+   const [error, setError] = useState('');
++  const [shellCommand, setShellCommand] = useState('');
++  const [shellOutput, setShellOutput] = useState('');
++  const [deviceProps, setDeviceProps] = useState<DeviceProps>(EMPTY_DEVICE_PROPS);
++  const [propsLoading, setPropsLoading] = useState(false);
+ 
+   useEffect(() => {
+     const load = async () => {
+@@ -61,6 +83,29 @@ export function ConsolePage() {
+     }
+   }, [devices, selectedDevice]);
+ 
++  const loadDeviceProps = useCallback(async () => {
++    if (!selectedDevice) {
++      return;
++    }
++    setPropsLoading(true);
++    try {
++      const result = await fetchDeviceProps(selectedDevice);
++      setDeviceProps(result.props);
++    } catch (requestError) {
++      setDeviceProps(EMPTY_DEVICE_PROPS);
++      showToast(
++        requestError instanceof Error ? requestError.message : '無法讀取裝置屬性',
++        'error',
++      );
++    } finally {
++      setPropsLoading(false);
++    }
++  }, [selectedDevice, showToast]);
++
++  useEffect(() => {
++    void loadDeviceProps();
++  }, [loadDeviceProps]);
++
+   useEffect(() => {
+     if (!selectedDevice) {
+       return;
+@@ -159,6 +204,73 @@ export function ConsolePage() {
+     }
+   };
+ 
++  const runAdbAction = async (
++    label: string,
++    action: () => Promise<unknown>,
++  ) => {
++    if (!selectedDevice) {
++      return;
++    }
++    try {
++      await action();
++      showToast(`${label} 已執行${isDemoMode ? '（展示模式）' : ''}`, 'success');
++    } catch (requestError) {
++      showToast(
++        requestError instanceof Error ? requestError.message : `${label} 失敗`,
++        'error',
++      );
++    }
++  };
++
++  const handleLaunchApp = async () => {
++    if (!selectedDevice) {
++      return;
++    }
++    await runAdbAction('開啟 App', () =>
++      launchApp(
++        selectedDevice,
++        ULTRON_PLAYER_APK_SOURCE.packageName,
++        ULTRON_PLAYER_APK_SOURCE.launchActivity,
++      ),
++    );
++  };
++
++  const handleForceStop = async () => {
++    if (!selectedDevice) {
++      return;
++    }
++    await runAdbAction('強制停止', () =>
++      forceStopApp(selectedDevice, ULTRON_PLAYER_APK_SOURCE.packageName),
++    );
++  };
++
++  const handleReboot = async () => {
++    if (!selectedDevice) {
++      return;
++    }
++    if (!window.confirm('確定要重新開機這台 STB 嗎？')) {
++      return;
++    }
++    await runAdbAction('重新開機', () => rebootDevice(selectedDevice));
++  };
++
++  const handleShell = async () => {
++    if (!selectedDevice || !shellCommand.trim()) {
++      return;
++    }
++    try {
++      const result = await runShellCommand(selectedDevice, shellCommand.trim());
++      setShellOutput(result.output || '（無輸出）');
++      showToast('Shell 指令已執行', 'success');
++    } catch (requestError) {
++      setShellOutput('');
++      showToast(
++        requestError instanceof Error ? requestError.message : 'Shell 指令失敗',
++        'error',
++      );
++    }
++  };
++
+   const handleCapture = async () => {
+     if (!selectedDevice) {
+       return;
+@@ -219,7 +331,7 @@ export function ConsolePage() {
+           </div>
+           <div className="field-group">
+             <label htmlFor="adb-text">輸入文字</label>
+-            <div className="inline-field">
++            <div className="inline-field inline-field--stack">
+               <input
+                 id="adb-text"
+                 className="input"
+@@ -232,6 +344,69 @@ export function ConsolePage() {
+               </button>
+             </div>
+           </div>
++
++          <div className="console-adb-tools">
++            <h3>ADB 工具</h3>
++            <div className="console-adb-tools__grid">
++              <button type="button" className="btn btn--secondary" onClick={() => void handleLaunchApp()}>
++                開啟 App
++              </button>
++              <button type="button" className="btn btn--secondary" onClick={() => void handleForceStop()}>
++                強制停止
++              </button>
++              <button type="button" className="btn btn--ghost" onClick={() => void handleKey('volUp')}>
++                音量+
++              </button>
++              <button type="button" className="btn btn--ghost" onClick={() => void handleKey('volDown')}>
++                音量-
++              </button>
++              <button type="button" className="btn btn--ghost" onClick={() => void handleKey('power')}>
++                電源
++              </button>
++              <button type="button" className="btn btn--ghost" onClick={() => void handleReboot()}>
++                重新開機
++              </button>
++            </div>
++
++            <div className="field-group">
++              <label htmlFor="adb-shell">Shell 指令</label>
++              <div className="inline-field inline-field--stack">
++                <input
++                  id="adb-shell"
++                  className="input"
++                  value={shellCommand}
++                  onChange={(event) => setShellCommand(event.target.value)}
++                  placeholder="getprop ro.product.brand"
++                />
++                <button type="button" className="btn btn--secondary" onClick={() => void handleShell()}>
++                  執行
++                </button>
++              </div>
++              {shellOutput ? <pre className="shell-output">{shellOutput}</pre> : null}
++            </div>
++
++            <div className="console-adb-props">
++              <div className="panel-header-row">
++                <h3>裝置屬性</h3>
++                <button
++                  type="button"
++                  className="btn btn--ghost"
++                  disabled={propsLoading}
++                  onClick={() => void loadDeviceProps()}
++                >
++                  {propsLoading ? '讀取中…' : '刷新'}
++                </button>
++              </div>
++              <dl className="meta-list meta-list--compact">
++                <div><dt>品牌</dt><dd>{deviceProps.product_brand || '-'}</dd></div>
++                <div><dt>製造商</dt><dd>{deviceProps.product_manufacturer || '-'}</dd></div>
++                <div><dt>型號</dt><dd>{deviceProps.product_model || '-'}</dd></div>
++                <div><dt>Android</dt><dd>{deviceProps.android_version || '-'}</dd></div>
++                <div><dt>SDK</dt><dd>{deviceProps.sdk_version || '-'}</dd></div>
++                <div><dt>序號</dt><dd>{deviceProps.serial || '-'}</dd></div>
++              </dl>
++            </div>
++          </div>
+         </aside>
+ 
+         <section className="panel panel--preview">
+diff --git a/frontend/src/types/console-adb-types.ts b/frontend/src/types/console-adb-types.ts
+new file mode 100644
+index 0000000..5a53fb5
+--- /dev/null
++++ b/frontend/src/types/console-adb-types.ts
+@@ -0,0 +1,23 @@
++export interface DeviceProps {
++  product_brand: string;
++  product_manufacturer: string;
++  product_model: string;
++  android_version: string;
++  serial: string;
++  sdk_version: string;
++}
++
++export interface DevicePropsResponse {
++  props: DeviceProps;
++  mock: string;
++}
++
++export interface ShellCommandResponse {
++  output: string;
++  mock: string;
++}
++
++export interface AdbActionResponse {
++  status: string;
++  mock: string;
++}

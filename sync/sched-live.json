@@ -1,0 +1,170 @@
+﻿{
+    "device_id":  "192.168.1.148:5555",
+    "projects":  [
+                     {
+                         "id":  210,
+                         "name":  "",
+                         "layout_id":  3,
+                         "layout_name":  "Basic 1920x1080 16:9",
+                         "start_date":  "2026-09-15",
+                         "end_date":  "2026-09-30",
+                         "start_time":  "18:31:00",
+                         "end_time":  "23:59:59",
+                         "day_of_weeks":  "1,2,3,4,5,6,7",
+                         "is_interrupt":  false,
+                         "media_ids":  [
+                                           2418,
+                                           2417,
+                                           2418,
+                                           2417,
+                                           2418,
+                                           2417,
+                                           2418,
+                                           2417,
+                                           2418,
+                                           2417
+                                       ]
+                     },
+                     {
+                         "id":  211,
+                         "name":  "",
+                         "layout_id":  3,
+                         "layout_name":  "Basic 1920x1080 16:9",
+                         "start_date":  "2026-09-15",
+                         "end_date":  "2026-09-30",
+                         "start_time":  "14:00:00",
+                         "end_time":  "18:30:59",
+                         "day_of_weeks":  "1,2,3,4,5,6,7",
+                         "is_interrupt":  false,
+                         "media_ids":  [
+                                           2415,
+                                           2414,
+                                           2413
+                                       ]
+                     }
+                 ],
+    "media":  [
+                  {
+                      "id":  2413,
+                      "name":  "æ¸¬è©¦ Green 03",
+                      "type":  "image",
+                      "duration_sec":  3,
+                      "start_date":  "2026-01-07",
+                      "end_date":  "2029-01-08",
+                      "file_name":  "å¥§åµå³åª_!260107-290108_æ¸¬è©¦ Green 03_3s.jpg"
+                  },
+                  {
+                      "id":  2414,
+                      "name":  "æ¸¬è©¦ Green 02",
+                      "type":  "image",
+                      "duration_sec":  3,
+                      "start_date":  "2026-01-07",
+                      "end_date":  "2029-01-08",
+                      "file_name":  "å¥§åµå³åª_!260107-290108_æ¸¬è©¦ Green 02_3s.jpg"
+                  },
+                  {
+                      "id":  2415,
+                      "name":  "æ¸¬è©¦ Green 01",
+                      "type":  "image",
+                      "duration_sec":  3,
+                      "start_date":  "2026-01-07",
+                      "end_date":  "2029-01-08",
+                      "file_name":  "å¥§åµå³åª_!260107-290108_æ¸¬è©¦ Green 01_3s.jpg"
+                  },
+                  {
+                      "id":  2417,
+                      "name":  "æ¸¬è©¦ Yellow 02",
+                      "type":  "image",
+                      "duration_sec":  1,
+                      "start_date":  "2026-01-07",
+                      "end_date":  "2029-01-08",
+                      "file_name":  "å¥§åµå³åª_!260107-290108_æ¸¬è©¦ Yellow 02_3s.jpg"
+                  },
+                  {
+                      "id":  2418,
+                      "name":  "æ¸¬è©¦ Yellow 01",
+                      "type":  "image",
+                      "duration_sec":  1,
+                      "start_date":  "2026-01-07",
+                      "end_date":  "2029-01-08",
+                      "file_name":  "å¥§åµå³åª_!260107-290108_æ¸¬è©¦ Yellow 01_3s.jpg"
+                  }
+              ],
+    "time_table":  [
+                       {
+                           "project_id":  210,
+                           "media_id":  2418,
+                           "sequence":  1
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2417,
+                           "sequence":  2
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2418,
+                           "sequence":  3
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2417,
+                           "sequence":  4
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2418,
+                           "sequence":  5
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2417,
+                           "sequence":  6
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2418,
+                           "sequence":  7
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2417,
+                           "sequence":  8
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2418,
+                           "sequence":  9
+                       },
+                       {
+                           "project_id":  210,
+                           "media_id":  2417,
+                           "sequence":  10
+                       },
+                       {
+                           "project_id":  211,
+                           "media_id":  2415,
+                           "sequence":  1
+                       },
+                       {
+                           "project_id":  211,
+                           "media_id":  2414,
+                           "sequence":  2
+                       },
+                       {
+                           "project_id":  211,
+                           "media_id":  2413,
+                           "sequence":  3
+                       }
+                   ],
+    "today_schedule":  {
+                           "date":  "2026-09-15",
+                           "project_ids":  [
+                                               210,
+                                               210,
+                                               211
+                                           ]
+                       },
+    "mock":  false,
+    "error":  ""
+}

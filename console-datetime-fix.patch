@@ -1,0 +1,75 @@
+From fd7c79ab320515daa426386a72321d1f7b89897e Mon Sep 17 00:00:00 2001
+From: Cursor Agent <cursoragent@cursor.com>
+Date: Fri, 18 Sep 2026 09:09:21 +0000
+Subject: [PATCH] fix(console): use Android toybox date format for STB datetime
+ set
+
+Co-authored-by: admin <admin@ultron-ad.com>
+---
+ agent/services/adb_service.py | 38 +++++++++++++++++++++--------------
+ 1 file changed, 23 insertions(+), 15 deletions(-)
+
+diff --git a/agent/services/adb_service.py b/agent/services/adb_service.py
+index d4a42d9..b1ec432 100644
+--- a/agent/services/adb_service.py
++++ b/agent/services/adb_service.py
+@@ -412,33 +412,41 @@ class AdbService:
+             )
+ 
+     @staticmethod
+-    def _format_datetime_for_adb(iso_datetime: str) -> str:
++    def _parse_device_datetime(iso_datetime: str) -> datetime:
+         normalized = iso_datetime.strip()
+         try:
+-            parsed = datetime.fromisoformat(normalized)
++            return datetime.fromisoformat(normalized)
+         except ValueError as error:
+             raise ValueError(
+                 "datetime must be ISO format, e.g. 2026-09-18T14:30:00",
+             ) from error
+-        return parsed.strftime("%Y-%m-%d %H:%M:%S")
+ 
+     async def set_device_datetime(self, device_id: str, iso_datetime: str) -> str:
+         if not self.adb_available:
+             return ""
+ 
+-        formatted = self._format_datetime_for_adb(iso_datetime)
+-        return_code, stdout, stderr = await self._run_adb(
+-            "-s",
+-            device_id,
+-            "shell",
+-            "date",
+-            "-s",
+-            formatted,
+-            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++        parsed = self._parse_device_datetime(iso_datetime)
++        android_token = parsed.strftime("%m%d%H%M%Y.%S")
++        gnu_token = parsed.strftime("%Y-%m-%d %H:%M:%S")
++        attempts: tuple[tuple[str, ...], ...] = (
++            ("date", android_token),
++            ("date", "-s", gnu_token),
+         )
+-        if return_code != 0:
+-            raise RuntimeError(stderr or stdout or "Failed to set device datetime")
+-        return stdout.strip() or f"Device time set to {formatted}"
++
++        last_error = ""
++        for shell_args in attempts:
++            return_code, stdout, stderr = await self._run_adb(
++                "-s",
++                device_id,
++                "shell",
++                *shell_args,
++                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
++            )
++            if return_code == 0:
++                return stdout.strip() or f"Device time set to {gnu_token}"
++            last_error = (stderr or stdout or "").strip()
++
++        raise RuntimeError(last_error or "Failed to set device datetime")
+ 
+     async def restore_network_time(self, device_id: str) -> str:
+         if not self.adb_available:
+-- 
+2.43.0
+

@@ -11,6 +11,15 @@ Internal web console for testing APK builds on multiple Android set-top boxes vi
 └── frontend/       # Vite + React + TypeScript SPA
 ```
 
+## Office one-click (Windows)
+
+```powershell
+cd D:\Cursor\ultron-adb-qa-site
+.\scripts\office-update-and-start.ps1
+```
+
+Pulls branch `cursor/console-apk-zh-tw-c5d8` then opens **http://127.0.0.1:43123/console** (繁中主控台：APK 安裝/卸載、清除資料、錄影、時間設定、截圖、Logcat)。
+
 ## Prerequisites
 
 - Node.js 18+

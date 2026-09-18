@@ -1,0 +1,521 @@
+{
+  "qa_api_devices": [
+    {
+      "id": "192.168.1.148:5555",
+      "label": "192.168.1.148:5555",
+      "ip": "192.168.1.148:5555",
+      "online": true,
+      "model": "taishan",
+      "android_version": "-",
+      "cpu_percent": 0.0,
+      "ram_percent": 0.0,
+      "ping_ms": 0.0,
+      "product_brand": "AOC",
+      "product_manufacturer": "TAISHAN",
+      "product_model": "taishan",
+      "brand_name": "奧創傳媒",
+      "branch_name": "多專案排程",
+      "player_device_id": 101,
+      "category_name": "多專案排程",
+      "installed_apk_version": "v1.0.0(10054)_20260908",
+      "last_schedule_sync_at": "2026-09-15"
+    }
+  ],
+  "adb_props": {
+    "brand": "AOC",
+    "manufacturer": "TAISHAN",
+    "model": "taishan",
+    "device": "tv",
+    "android": "12"
+  },
+  "apk_version_lines": [
+    "versionCode=10054 minSdk=19 targetSdk=35",
+    "versionName=v1.0.0(10054)_20260908",
+    "versionCode=176 minSdk=19 targetSdk=35",
+    "versionName=v1.0.0(176)_20250401"
+  ],
+  "sqlite_tables": [
+    "android_metadata",
+    "device",
+    "layout",
+    "login",
+    "media",
+    "media_history",
+    "media_period",
+    "project",
+    "project_history",
+    "room_master_table",
+    "schedule",
+    "section",
+    "sqlite_sequence",
+    "time_table"
+  ],
+  "sqlite_samples": {
+    "android_metadata": {
+      "cols": [
+        "locale"
+      ],
+      "rows": [
+        {
+          "locale": "zh_TW"
+        }
+      ]
+    },
+    "device": {
+      "cols": [
+        "uid",
+        "deviceId",
+        "branchName",
+        "categoryName"
+      ],
+      "rows": [
+        {
+          "uid": 1,
+          "deviceId": 28,
+          "branchName": "測試002號店",
+          "categoryName": "裝置分類$奧創傳媒"
+        },
+        {
+          "uid": 2,
+          "deviceId": 29,
+          "branchName": "測試002號店",
+          "categoryName": "裝置分類$奧創傳媒"
+        },
+        {
+          "uid": 3,
+          "deviceId": 30,
+          "branchName": "測試002號店",
+          "categoryName": "裝置分類$奧創傳媒"
+        },
+        {
+          "uid": 4,
+          "deviceId": 32,
+          "branchName": "測試002號店",
+          "categoryName": "裝置分類$奧創傳媒"
+        },
+        {
+          "uid": 5,
+          "deviceId": 33,
+          "branchName": "測試002號店",
+          "categoryName": "裝置分類$奧創傳媒"
+        }
+      ]
+    },
+    "layout": {
+      "cols": [
+        "id",
+        "name"
+      ],
+      "rows": [
+        {
+          "id": 1,
+          "name": "1920*1080"
+        }
+      ]
+    },
+    "login": {
+      "cols": [
+        "uid",
+        "uuid",
+        "key",
+        "token",
+        "email",
+        "password",
+        "brandName",
+        "branchName",
+        "categoryName",
+        "deviceId",
+        "lastGetScheduleDate"
+      ],
+      "rows": [
+        {
+          "uid": 1,
+          "uuid": "29f51a59-b1df-491a-8338-8d5b0f8dbc58",
+          "key": "162b3e725c1c2502291689b31ec20724",
+          "token": "292|EJPByUMuC9okFAogmPCVjGW1PYkWpymF5tQ5dM3h",
+          "email": "service@ultron-ad.com",
+          "password": "42657366",
+          "brandName": "奧創傳媒",
+          "branchName": "多專案排程",
+          "categoryName": "多專案排程",
+          "deviceId": 101,
+          "lastGetScheduleDate": "2026-09-15"
+        }
+      ]
+    },
+    "media": {
+      "cols": [
+        "id",
+        "name",
+        "type",
+        "duration",
+        "startDate",
+        "endDate",
+        "param",
+        "textSize",
+        "speed",
+        "color",
+        "backgroundColor"
+      ],
+      "rows": [
+        {
+          "id": 17,
+          "name": "歐兔新莊中誠餐點介紹5",
+          "type": "image",
+          "duration": 15,
+          "startDate": "2025-01-08",
+          "endDate": "2030-01-01",
+          "param": "奧創傳媒_!250108-300101_歐兔新莊中誠餐點介紹5_15s.jpg",
+          "textSize": null,
+          "speed": null,
+          "color": null,
+          "backgroundColor": null
+        },
+        {
+          "id": 24,
+          "name": "TOP10 Webpage v20250411 圖片",
+          "type": "url",
+          "duration": 100,
+          "startDate": "2025-05-06",
+          "endDate": "2030-05-06",
+          "param": "https://yixuantang623.github.io/teatop2/",
+          "textSize": null,
+          "speed": null,
+          "color": null,
+          "backgroundColor": null
+        },
+        {
+          "id": 31,
+          "name": "測試 Green 02",
+          "type": "image",
+          "duration": 3,
+          "startDate": "2026-01-07",
+          "endDate": "2029-01-08",
+          "param": "奧創傳媒_!260107-290108_測試 Green 02_3s.jpg",
+          "textSize": null,
+          "speed": null,
+          "color": null,
+          "backgroundColor": null
+        },
+        {
+          "id": 32,
+          "name": "測試 Green 01",
+          "type": "image",
+          "duration": 3,
+          "startDate": "2026-01-07",
+          "endDate": "2029-01-08",
+          "param": "奧創傳媒_!260107-290108_測試 Green 01_3s.jpg",
+          "textSize": null,
+          "speed": null,
+          "color": null,
+          "backgroundColor": null
+        },
+        {
+          "id": 34,
+          "name": "測試 Blue 02",
+          "type": "image",
+          "duration": 3,
+          "startDate": "2026-01-07",
+          "endDate": "2029-01-08",
+          "param": "奧創傳媒_!260107-290108_測試 Blue 02_3s.jpg",
+          "textSize": null,
+          "speed": null,
+          "color": null,
+          "backgroundColor": null
+        }
+      ]
+    },
+    "media_history": {
+      "cols": [
+        "id",
+        "date",
+        "count"
+      ],
+      "rows": [
+        {
+          "id": 41,
+          "date": "2026-09-21",
+          "count": 183
+        },
+        {
+          "id": 32,
+          "date": "2026-09-21",
+          "count": 159
+        },
+        {
+          "id": 31,
+          "date": "2026-09-21",
+          "count": 83
+        },
+        {
+          "id": 41,
+          "date": "2026-09-15",
+          "count": 284
+        },
+        {
+          "id": 32,
+          "date": "2026-09-15",
+          "count": 270
+        }
+      ]
+    },
+    "media_period": {
+      "cols": [
+        "id",
+        "name",
+        "type",
+        "startDate",
+        "endDate",
+        "url",
+        "fileName"
+      ],
+      "rows": [
+        {
+          "id": 17,
+          "name": "歐兔新莊中誠餐點介紹5",
+          "type": "image",
+          "startDate": "2025-01-08",
+          "endDate": "2030-01-01",
+          "url": "https://storage.googleapis.com/ultron-devdev/奧創傳媒_!250108-300101_歐兔新莊中誠餐點介紹5_15s.jpg",
+          "fileName": "奧創傳媒_!250108-300101_歐兔新莊中誠餐點介紹5_15s.jpg"
+        },
+        {
+          "id": 31,
+          "name": "測試 Green 02",
+          "type": "image",
+          "startDate": "2026-01-07",
+          "endDate": "2029-01-08",
+          "url": "https://storage.googleapis.com/ultron-devdev/奧創傳媒_!260107-290108_測試 Green 02_3s.jpg",
+          "fileName": "奧創傳媒_!260107-290108_測試 Green 02_3s.jpg"
+        },
+        {
+          "id": 32,
+          "name": "測試 Green 01",
+          "type": "image",
+          "startDate": "2026-01-07",
+          "endDate": "2029-01-08",
+          "url": "https://storage.googleapis.com/ultron-devdev/奧創傳媒_!260107-290108_測試 Green 01_3s.jpg",
+          "fileName": "奧創傳媒_!260107-290108_測試 Green 01_3s.jpg"
+        },
+        {
+          "id": 34,
+          "name": "測試 Blue 02",
+          "type": "image",
+          "startDate": "2026-01-07",
+          "endDate": "2029-01-08",
+          "url": "https://storage.googleapis.com/ultron-devdev/奧創傳媒_!260107-290108_測試 Blue 02_3s.jpg",
+          "fileName": "奧創傳媒_!260107-290108_測試 Blue 02_3s.jpg"
+        },
+        {
+          "id": 35,
+          "name": "測試 Blue 01",
+          "type": "image",
+          "startDate": "2026-01-07",
+          "endDate": "2029-01-08",
+          "url": "https://storage.googleapis.com/ultron-devdev/奧創傳媒_!260107-290108_測試 Blue 01_3s.jpg",
+          "fileName": "奧創傳媒_!260107-290108_測試 Blue 01_3s.jpg"
+        }
+      ]
+    },
+    "project": {
+      "cols": [
+        "id",
+        "layoutId",
+        "startDate",
+        "endDate",
+        "startTime",
+        "endTime",
+        "isOnlyOnce",
+        "dayOfWeeks",
+        "isInterrupt"
+      ],
+      "rows": [
+        {
+          "id": 1,
+          "layoutId": 1,
+          "startDate": "2026-09-14",
+          "endDate": "2026-09-30",
+          "startTime": "00:00:00",
+          "endTime": "23:59:59",
+          "isOnlyOnce": 0,
+          "dayOfWeeks": "1,2,3,4,5,6,7",
+          "isInterrupt": 1
+        },
+        {
+          "id": 5,
+          "layoutId": 1,
+          "startDate": "2026-09-14",
+          "endDate": "2026-09-22",
+          "startTime": "00:00:00",
+          "endTime": "16:29:59",
+          "isOnlyOnce": 0,
+          "dayOfWeeks": "1,2,3,4,5,6,7",
+          "isInterrupt": 0
+        },
+        {
+          "id": 9,
+          "layoutId": 1,
+          "startDate": "2026-09-14",
+          "endDate": "2026-09-22",
+          "startTime": "07:50:26",
+          "endTime": "23:59:59",
+          "isOnlyOnce": 0,
+          "dayOfWeeks": "1,2,3,4,5,6,7",
+          "isInterrupt": 0
+        }
+      ]
+    },
+    "project_history": {
+      "cols": [
+        "id",
+        "date",
+        "count"
+      ],
+      "rows": [
+        {
+          "id": 5,
+          "date": "2026-09-21",
+          "count": 83
+        },
+        {
+          "id": 5,
+          "date": "2026-09-14",
+          "count": 78
+        },
+        {
+          "id": 9,
+          "date": "2026-09-14",
+          "count": 92
+        },
+        {
+          "id": 1,
+          "date": "2026-09-14",
+          "count": 15
+        },
+        {
+          "id": 9,
+          "date": "2026-09-21",
+          "count": 96
+        }
+      ]
+    },
+    "room_master_table": {
+      "cols": [
+        "id",
+        "identity_hash"
+      ],
+      "rows": [
+        {
+          "id": 42,
+          "identity_hash": "2d6821f4c5a3868145944413cd09aac8"
+        }
+      ]
+    },
+    "schedule": {
+      "cols": [
+        "date",
+        "projectIds"
+      ],
+      "rows": [
+        {
+          "date": "2026-09-15",
+          "projectIds": "9,5,1"
+        },
+        {
+          "date": "2026-09-16",
+          "projectIds": "9,5,1"
+        },
+        {
+          "date": "2026-09-17",
+          "projectIds": "9,5,1"
+        },
+        {
+          "date": "2026-09-18",
+          "projectIds": "9,5,1"
+        },
+        {
+          "date": "2026-09-19",
+          "projectIds": "9,5,1"
+        }
+      ]
+    },
+    "section": {
+      "cols": [
+        "id",
+        "layoutId",
+        "name",
+        "width",
+        "height",
+        "x",
+        "y"
+      ],
+      "rows": [
+        {
+          "id": 1,
+          "layoutId": 1,
+          "name": "全版",
+          "width": 1920,
+          "height": 1080,
+          "x": 0,
+          "y": 0
+        }
+      ]
+    },
+    "sqlite_sequence": {
+      "cols": [
+        "name",
+        "seq"
+      ],
+      "rows": [
+        {
+          "name": "login",
+          "seq": 1
+        },
+        {
+          "name": "device",
+          "seq": 16
+        }
+      ]
+    },
+    "time_table": {
+      "cols": [
+        "projectId",
+        "sectionId",
+        "mediaId",
+        "sequence"
+      ],
+      "rows": [
+        {
+          "projectId": 9,
+          "sectionId": 1,
+          "mediaId": 41,
+          "sequence": 1
+        },
+        {
+          "projectId": 9,
+          "sectionId": 1,
+          "mediaId": 17,
+          "sequence": 2
+        },
+        {
+          "projectId": 9,
+          "sectionId": 1,
+          "mediaId": 42,
+          "sequence": 3
+        },
+        {
+          "projectId": 5,
+          "sectionId": 1,
+          "mediaId": 32,
+          "sequence": 1
+        },
+        {
+          "projectId": 5,
+          "sectionId": 1,
+          "mediaId": 31,
+          "sequence": 2
+        }
+      ]
+    }
+  }
+}

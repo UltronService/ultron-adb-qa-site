@@ -1,13 +1,16 @@
-import asyncio
+﻿import asyncio
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import time
 import urllib.error
 import urllib.request
 from collections.abc import AsyncIterator
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 from models.schemas import DeviceInfo
 
@@ -18,6 +21,7 @@ ULTRON_LOGIN_SQL = (
     "FROM login LIMIT 1;"
 )
 ADB_SHELL_TIMEOUT_SEC = 8.0
+SCREENRECORD_MAX_SECONDS = 180
 
 LOG_LEVEL_MAP = {
     "Verbose": "V",
@@ -302,19 +306,183 @@ class AdbService:
         if return_code != 0:
             raise RuntimeError(stderr or "Text input failed")
 
-    async def install_apk(self, device_id: str, apk_path: str) -> None:
+    async def install_apk(
+        self,
+        device_id: str,
+        apk_path: str,
+        *,
+        replace: bool = True,
+        allow_downgrade: bool = False,
+    ) -> None:
         if not self.adb_available:
             return
+
+        path = Path(apk_path)
+        if not path.is_file():
+            raise ValueError(f"APK file not found: {apk_path}")
+
+        install_args = ["-s", device_id, "install"]
+        if replace:
+            install_args.append("-r")
+        if allow_downgrade:
+            install_args.append("-d")
+        install_args.append(str(path))
+
+        return_code, stdout, stderr = await self._run_adb(
+            *install_args,
+            timeout_sec=300.0,
+        )
+        output = stdout or stderr
+        if return_code != 0 or "Success" not in output:
+            raise RuntimeError(output or "APK install failed")
+
+    async def uninstall_app(self, device_id: str, package_name: str) -> None:
+        if not self.adb_available:
+            return
+
+        normalized = package_name.strip()
+        if not normalized:
+            raise ValueError("Package name is required")
+
+        return_code, stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "uninstall",
+            normalized,
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        output = stdout or stderr
+        if return_code != 0 or "Success" not in output:
+            raise RuntimeError(output or "App uninstall failed")
+
+    async def clear_app_data(self, device_id: str, package_name: str) -> None:
+        if not self.adb_available:
+            return
+
+        normalized = package_name.strip()
+        if not normalized:
+            raise ValueError("Package name is required")
+
+        return_code, stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "pm",
+            "clear",
+            normalized,
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        output = stdout or stderr
+        if return_code != 0 or "Success" not in output:
+            raise RuntimeError(output or "Failed to clear app data")
+
+    async def capture_screen_record(self, device_id: str, duration_seconds: int) -> bytes:
+        if not self.adb_available:
+            return b""
+
+        bounded_duration = min(max(duration_seconds, 1), SCREENRECORD_MAX_SECONDS)
+        remote_path = f"/sdcard/ultron-rec-{int(time.time())}.mp4"
+        record_timeout = float(bounded_duration + 15)
 
         return_code, _stdout, stderr = await self._run_adb(
             "-s",
             device_id,
-            "install",
-            "-r",
-            apk_path,
+            "shell",
+            "screenrecord",
+            "--time-limit",
+            str(bounded_duration),
+            remote_path,
+            timeout_sec=record_timeout,
         )
         if return_code != 0:
-            raise RuntimeError(stderr or "APK install failed")
+            raise RuntimeError(stderr or "Screen recording failed")
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as temp_file:
+            local_path = Path(temp_file.name)
+
+        try:
+            return_code, _stdout, stderr = await self._run_adb(
+                "-s",
+                device_id,
+                "pull",
+                remote_path,
+                str(local_path),
+                timeout_sec=record_timeout,
+            )
+            if return_code != 0:
+                raise RuntimeError(stderr or "Screen recording pull failed")
+
+            video_bytes = local_path.read_bytes()
+            if not video_bytes:
+                raise RuntimeError("Screen recording returned empty data")
+            return video_bytes
+        finally:
+            local_path.unlink(missing_ok=True)
+            await self._run_adb(
+                "-s",
+                device_id,
+                "shell",
+                "rm",
+                "-f",
+                remote_path,
+                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+            )
+
+    @staticmethod
+    def _format_datetime_for_adb(iso_datetime: str) -> str:
+        normalized = iso_datetime.strip()
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError as error:
+            raise ValueError(
+                "datetime must be ISO format, e.g. 2026-09-18T14:30:00",
+            ) from error
+        return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+    async def set_device_datetime(self, device_id: str, iso_datetime: str) -> str:
+        if not self.adb_available:
+            return ""
+
+        formatted = self._format_datetime_for_adb(iso_datetime)
+        return_code, stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "date",
+            "-s",
+            formatted,
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or stdout or "Failed to set device datetime")
+        return stdout.strip() or f"Device time set to {formatted}"
+
+    async def restore_network_time(self, device_id: str) -> str:
+        if not self.adb_available:
+            return ""
+
+        for args in (
+            ("settings", "put", "global", "auto_time", "1"),
+            ("settings", "put", "global", "auto_time_zone", "1"),
+        ):
+            return_code, _stdout, stderr = await self._run_adb(
+                "-s",
+                device_id,
+                "shell",
+                *args,
+                timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+            )
+            if return_code != 0:
+                raise RuntimeError(stderr or "Failed to restore network time")
+
+        return_code, stdout, _stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "date",
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        return stdout.strip() or "Network time sync enabled (auto_time=1, auto_time_zone=1)"
 
     async def resolve_package_pid(self, device_id: str, package_name: str) -> str | None:
         if not self.adb_available or not package_name:
@@ -446,6 +614,103 @@ class AdbService:
         )
         if return_code != 0:
             raise RuntimeError(stderr or "Activity launch failed")
+
+    async def launch_app(
+        self,
+        device_id: str,
+        package_name: str,
+        activity: str = "",
+    ) -> None:
+        if not self.adb_available:
+            return
+
+        if activity:
+            component = activity if "/" in activity else f"{package_name}/{activity}"
+            await self.launch_activity(device_id, component)
+            return
+
+        return_code, _stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "monkey",
+            "-p",
+            package_name,
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or "App launch failed")
+
+    async def force_stop_app(self, device_id: str, package_name: str) -> None:
+        if not self.adb_available:
+            return
+
+        return_code, _stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "am",
+            "force-stop",
+            package_name,
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or "Force stop failed")
+
+    async def reboot_device(self, device_id: str) -> None:
+        if not self.adb_available:
+            return
+
+        return_code, _stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "reboot",
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or "Reboot failed")
+
+    async def run_shell(self, device_id: str, command: str) -> str:
+        if not self.adb_available:
+            return ""
+
+        normalized = command.strip()
+        if not normalized:
+            raise ValueError("Shell command is required")
+
+        return_code, stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            normalized,
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or stdout or "Shell command failed")
+
+        return stdout.strip()
+
+    async def get_device_props(self, device_id: str) -> dict[str, str]:
+        if not self.adb_available:
+            return {}
+
+        prop_keys = {
+            "product_brand": "ro.product.brand",
+            "product_manufacturer": "ro.product.manufacturer",
+            "product_model": "ro.product.model",
+            "android_version": "ro.build.version.release",
+            "serial": "ro.serialno",
+            "sdk_version": "ro.build.version.sdk",
+        }
+        tasks = [self._fetch_getprop_value(device_id, key) for key in prop_keys.values()]
+        values = await asyncio.gather(*tasks)
+        return {
+            field: value
+            for field, value in zip(prop_keys.keys(), values, strict=True)
+        }
 
     async def _enrich_device(self, device: DeviceInfo) -> DeviceInfo:
         if not device.online or not self.adb_available:
@@ -645,3 +910,4 @@ class AdbService:
         if not match:
             return ""
         return match.group(1).replace("_", " ")
+
