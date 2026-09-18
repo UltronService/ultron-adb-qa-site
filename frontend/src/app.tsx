@@ -7,6 +7,7 @@ import { ConsolePage } from './pages/console-page';
 import { DevicesPage } from './pages/devices-page';
 import { HomePage } from './pages/home-page';
 import { ReportsPage } from './pages/reports-page';
+import { SchedulePage } from './pages/schedule-page';
 import { ScriptsPage } from './pages/scripts-page';
 
 const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -19,6 +20,7 @@ export function App() {
           <Route element={<AppLayout />} path="/">
             <Route element={<HomePage />} index />
             <Route element={<DevicesPage />} path="devices" />
+            <Route element={<SchedulePage />} path="schedule" />
             <Route element={<ConsolePage />} path="console" />
             <Route element={<ApkPage />} path="apk" />
             <Route element={<AutomationPage />} path="automation" />

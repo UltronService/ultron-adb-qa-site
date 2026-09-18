@@ -465,3 +465,170 @@ a { color: inherit; text-decoration: none; }
 .activity-list__item--success strong { color: #81c784; }
 .activity-list__item--warn strong { color: #ffb74d; }
 .activity-list__item--info strong { color: #64b5f6; }
+
+.schedule-hint { color: #c5d0e0; font-size: 0.92rem; }
+.schedule-picker__lead { margin: 0 0 0.75rem; color: #a8b3c5; }
+.schedule-picker__meta { margin: 0; color: #a8b3c5; font-size: 0.88rem; }
+.schedule-device-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; align-items: center; }
+.schedule-device-bar__info h2 { margin: 0 0 0.25rem; font-size: 1.1rem; }
+.schedule-device-bar__info p { margin: 0; color: #a8b3c5; font-size: 0.9rem; }
+.schedule-table-wrap { overflow-x: auto; }
+.schedule-file-cell { max-width: 280px; word-break: break-all; }
+.schedule-empty { margin: 0; color: #a8b3c5; }
+.schedule-error { color: #ef9a9a; border-color: #5d2f2f; }
+.schedule-mock-note { margin: 0; color: #ffb74d; font-size: 0.88rem; }
+.schedule-today p { margin: 0; color: #c5d0e0; }
+
+/* ── Schedule Now Summary ── */
+.schedule-now-summary { border-color: #2a4a6b; background: linear-gradient(135deg, #151b24 0%, #1a2740 100%); }
+.schedule-now-summary__title { margin: 0 0 0.5rem; font-size: 1rem; color: #90caf9; }
+.schedule-now-summary__current { margin: 0; font-size: 1.1rem; font-weight: 600; color: #e8edf5; }
+.schedule-now-summary__next { margin: 0.35rem 0 0; color: #a8b3c5; font-size: 0.95rem; }
+
+/* ── Schedule Gantt ── */
+.schedule-gantt__header { margin-bottom: 0.75rem; }
+.schedule-gantt__header h2 { margin: 0 0 0.25rem; }
+.schedule-gantt__subtitle { margin: 0; color: #a8b3c5; font-size: 0.88rem; }
+
+.schedule-gantt__chart { position: relative; overflow-x: auto; }
+.schedule-gantt__axis {
+  position: relative; height: 1.75rem; margin-left: 11.5rem;
+  border-bottom: 1px solid #334155;
+}
+.schedule-gantt__tick {
+  position: absolute; top: 0; height: 100%;
+  border-left: 1px solid #2a3545;
+}
+.schedule-gantt__tick-label {
+  position: absolute; top: 0; left: 2px;
+  font-size: 0.78rem; color: #8b9cb3; white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.schedule-gantt__rows { position: relative; display: flex; flex-direction: column; gap: 0.55rem; padding-top: 0.65rem; }
+.schedule-gantt__row {
+  display: flex; align-items: center; gap: 0.65rem; min-height: 2.6rem;
+  border-radius: 0.45rem; padding: 0.15rem 0.25rem;
+}
+.schedule-gantt__row--selected { background: rgba(61, 90, 254, 0.12); }
+.schedule-gantt__label {
+  flex: 0 0 11rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.2rem;
+  font-size: 0.84rem; color: #e8edf5; text-align: left;
+  background: transparent; border: none; padding: 0.25rem 0; cursor: pointer;
+}
+.schedule-gantt__label:hover { color: #90caf9; }
+.schedule-gantt__label-text { font-weight: 600; line-height: 1.3; }
+.schedule-gantt__interrupt-badge {
+  background: #5d4037; color: #ffcc80; font-size: 0.68rem;
+  padding: 0.05rem 0.35rem; border-radius: 999px;
+}
+
+.schedule-gantt__track {
+  flex: 1; position: relative; height: 2.35rem;
+  background: #1a2230; border-radius: 0.45rem; min-width: 520px;
+}
+.schedule-gantt__bar {
+  position: absolute; top: 0.2rem; height: calc(100% - 0.4rem);
+  background: linear-gradient(135deg, #3d5afe, #536dfe);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 0.4rem; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; cursor: pointer; min-width: 4px;
+  transition: filter 0.15s, box-shadow 0.15s;
+}
+.schedule-gantt__bar:hover { filter: brightness(1.15); }
+.schedule-gantt__bar--interrupt {
+  background: linear-gradient(135deg, #e65100, #ff8f00);
+}
+.schedule-gantt__bar--selected {
+  box-shadow: 0 0 0 2px #90caf9;
+  filter: brightness(1.1);
+}
+.schedule-gantt__bar-time {
+  font-size: 0.82rem; font-weight: 600; color: #ffffff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 0.4rem;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+}
+
+.schedule-gantt__now-line {
+  position: absolute; top: -0.2rem; bottom: -0.2rem; width: 3px;
+  background: #ef5350; z-index: 2; pointer-events: none;
+  box-shadow: 0 0 6px rgba(239, 83, 80, 0.6);
+}
+
+/* ── Schedule Detail Table ── */
+.schedule-detail__header {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.75rem;
+  align-items: flex-start; margin-bottom: 0.5rem;
+}
+.schedule-detail__header h2 { margin: 0 0 0.25rem; }
+.schedule-detail__lead { margin: 0 0 0.2rem; color: #c5d0e0; font-size: 0.92rem; }
+.schedule-detail__meta { margin: 0; color: #a8b3c5; font-size: 0.88rem; }
+.schedule-detail__clear { flex-shrink: 0; font-size: 0.85rem; }
+.schedule-detail__toolbar { margin-bottom: 0.5rem; }
+.schedule-detail__toggle { font-size: 0.85rem; color: #8b9cb3; }
+.schedule-detail__table-wrap {
+  max-height: min(70vh, 720px); overflow: auto;
+  border: 1px solid #243041; border-radius: 0.5rem;
+}
+
+.schedule-detail-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.88rem; }
+.schedule-detail-table__head th {
+  position: sticky; top: 0; z-index: 2;
+  background: #1a2230; color: #90caf9; font-weight: 600;
+  padding: 0.55rem 0.65rem; border-bottom: 2px solid #334155;
+  text-align: left; white-space: nowrap;
+}
+.schedule-detail-table td {
+  padding: 0.45rem 0.65rem; border-bottom: 1px solid #243041;
+  vertical-align: top;
+}
+.schedule-detail-table__head .schedule-detail-table__col-order,
+.schedule-detail-table__col-order { width: 3.5rem; text-align: center; font-variant-numeric: tabular-nums; }
+.schedule-detail-table__head .schedule-detail-table__col-name,
+.schedule-detail-table__col-name { min-width: 9rem; font-weight: 500; color: #e8edf5; }
+.schedule-detail-table__head .schedule-detail-table__col-type,
+.schedule-detail-table__col-type { width: 4.5rem; white-space: nowrap; }
+.schedule-detail-table__head .schedule-detail-table__col-duration,
+.schedule-detail-table__col-duration { width: 4rem; text-align: right; font-variant-numeric: tabular-nums; }
+.schedule-detail-table__head .schedule-detail-table__col-date,
+.schedule-detail-table__col-date { width: 11rem; white-space: nowrap; color: #a8b3c5; font-size: 0.84rem; }
+.schedule-detail-table__head .schedule-detail-table__col-file,
+.schedule-detail-table__col-file { min-width: 12rem; }
+
+.schedule-detail-table__group-row td {
+  padding: 0; border-bottom: none;
+  background: #1f2a38;
+}
+.schedule-detail-table__group-inner {
+  display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+  padding: 0.55rem 0.65rem;
+  border-top: 2px solid #334155; border-bottom: 1px solid #2a3545;
+}
+.schedule-detail-table__group-title {
+  font-weight: 700; font-size: 0.92rem; color: #e8edf5; line-height: 1.35;
+}
+.schedule-detail-table__group-count {
+  margin-left: auto; color: #8b9cb3; font-size: 0.82rem; white-space: nowrap;
+}
+.schedule-detail-table__group-row--selected .schedule-detail-table__group-inner {
+  background: rgba(61, 90, 254, 0.18);
+  border-top-color: #3d5afe;
+  box-shadow: inset 0 0 0 1px rgba(61, 90, 254, 0.35);
+}
+.schedule-detail-table__group-row--pulse .schedule-detail-table__group-inner {
+  animation: schedule-group-pulse 2.4s ease-out;
+}
+.schedule-detail-table__row--selected td {
+  background: rgba(61, 90, 254, 0.08);
+}
+.schedule-detail-table__row--selected td:first-child {
+  box-shadow: inset 3px 0 0 #3d5afe;
+}
+.schedule-detail-table__empty-cell {
+  color: #8b9cb3; font-style: italic; padding-left: 1.5rem !important;
+}
+
+@keyframes schedule-group-pulse {
+  0% { background: rgba(61, 90, 254, 0.42); }
+  100% { background: rgba(61, 90, 254, 0.18); }
+}

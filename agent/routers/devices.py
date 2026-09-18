@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from models.schemas import ConnectDeviceRequest, DeviceInfo
+from models.schemas import ConnectDeviceRequest, DeviceInfo, ScheduleMediaResponse
 from services.adb_service import AdbService
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
@@ -31,3 +31,13 @@ async def scan_devices() -> list[DeviceInfo]:
         return await adb_service.scan_lan()
     except RuntimeError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.get("/{device_id}/schedule-media", response_model=ScheduleMediaResponse)
+async def get_device_schedule_media(device_id: str) -> ScheduleMediaResponse:
+    try:
+        return await adb_service.fetch_schedule_media(device_id)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error

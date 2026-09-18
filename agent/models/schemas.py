@@ -131,3 +131,48 @@ class ScriptRunStatus(BaseModel):
     state: str
     current_step: int
     results: list[ScriptRunStepResult]
+
+
+class ProjectScheduleItem(BaseModel):
+    id: int
+    name: str = ""
+    layout_id: int | None = None
+    layout_name: str = ""
+    start_date: str = ""
+    end_date: str = ""
+    start_time: str = ""
+    end_time: str = ""
+    day_of_weeks: str = ""
+    is_interrupt: bool = False
+    media_ids: list[int] = Field(default_factory=list)
+
+
+class TimeTableEntry(BaseModel):
+    project_id: int
+    media_id: int
+    sequence: int = 0
+
+
+class MediaScheduleItem(BaseModel):
+    id: int
+    name: str = ""
+    type: str = ""
+    duration_sec: int = 0
+    start_date: str = ""
+    end_date: str = ""
+    file_name: str = ""
+
+
+class TodaySchedule(BaseModel):
+    date: str
+    project_ids: list[int] = Field(default_factory=list)
+
+
+class ScheduleMediaResponse(BaseModel):
+    device_id: str
+    projects: list[ProjectScheduleItem] = Field(default_factory=list)
+    media: list[MediaScheduleItem] = Field(default_factory=list)
+    time_table: list[TimeTableEntry] = Field(default_factory=list)
+    today_schedule: TodaySchedule | None = None
+    mock: bool = False
+    error: str = ""

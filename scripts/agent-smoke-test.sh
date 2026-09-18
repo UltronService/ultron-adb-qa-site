@@ -58,6 +58,7 @@ PY
 fi
 
 if [[ -n "$DEVICE_ID" ]]; then
+  check "schedule media" "$BASE_URL/api/devices/$DEVICE_ID/schedule-media"
   code=$(curl -s -o /tmp/agent-test-body.json -w "%{http_code}" \
     -X POST "$BASE_URL/api/automation/run" \
     -H "Content-Type: application/json" \
