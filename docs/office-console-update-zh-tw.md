@@ -30,7 +30,7 @@ cd D:\Cursor\ultron-adb-qa-site
 
 ```powershell
 cd D:\Cursor\ultron-adb-qa-site
-git remote add admin-ultron https://github.com/admin-ultron/ultron-adb-qa-site.git
+git remote add admin-ultron https://origin.cursor.com/git/admin-ultron/ultron-adb-qa-site.git
 git fetch admin-ultron cursor/console-apk-zh-tw-c5d8
 git checkout -B cursor/console-apk-zh-tw-c5d8 admin-ultron/cursor/console-apk-zh-tw-c5d8
 cd frontend

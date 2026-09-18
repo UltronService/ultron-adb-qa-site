@@ -4,7 +4,8 @@
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Branch = "cursor/console-apk-zh-tw-c5d8"
-$AdminUltronUrl = "https://github.com/admin-ultron/ultron-adb-qa-site.git"
+$AdminUltronUrl = "https://origin.cursor.com/git/admin-ultron/ultron-adb-qa-site.git"
+$PatchFile = Join-Path $RepoRoot "patches\console-apk-zh-tw-full.patch"
 
 Set-Location $RepoRoot
 
@@ -38,9 +39,13 @@ foreach ($candidate in @("admin-ultron", "origin", "github")) {
 }
 
 if (-not $fetchRemote) {
-    Write-Host "ERROR: 找不到分支 $Branch" -ForegroundColor Red
-    Write-Host "請確認網路正常，或手動執行：" -ForegroundColor Yellow
-    Write-Host "  git fetch admin-ultron $Branch" -ForegroundColor Gray
+    if (Test-Path $PatchFile) {
+        Write-Host "無法 fetch 遠端分支，改套用本機 patch..." -ForegroundColor Yellow
+        & (Join-Path $RepoRoot "scripts\office-apply-zh-console.ps1")
+        exit $LASTEXITCODE
+    }
+    Write-Host "ERROR: 找不到分支 $Branch，也找不到 $PatchFile" -ForegroundColor Red
+    Write-Host "請在 Cursor Desktop 對本 repo 開 Agent，請求套用 cursor/console-apk-zh-tw-c5d8" -ForegroundColor Yellow
     exit 1
 }
 
