@@ -430,6 +430,103 @@ class AdbService:
         if return_code != 0:
             raise RuntimeError(stderr or "Activity launch failed")
 
+    async def launch_app(
+        self,
+        device_id: str,
+        package_name: str,
+        activity: str = "",
+    ) -> None:
+        if not self.adb_available:
+            return
+
+        if activity:
+            component = activity if "/" in activity else f"{package_name}/{activity}"
+            await self.launch_activity(device_id, component)
+            return
+
+        return_code, _stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "monkey",
+            "-p",
+            package_name,
+            "-c",
+            "android.intent.category.LAUNCHER",
+            "1",
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or "App launch failed")
+
+    async def force_stop_app(self, device_id: str, package_name: str) -> None:
+        if not self.adb_available:
+            return
+
+        return_code, _stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            "am",
+            "force-stop",
+            package_name,
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or "Force stop failed")
+
+    async def reboot_device(self, device_id: str) -> None:
+        if not self.adb_available:
+            return
+
+        return_code, _stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "reboot",
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or "Reboot failed")
+
+    async def run_shell(self, device_id: str, command: str) -> str:
+        if not self.adb_available:
+            return ""
+
+        normalized = command.strip()
+        if not normalized:
+            raise ValueError("Shell command is required")
+
+        return_code, stdout, stderr = await self._run_adb(
+            "-s",
+            device_id,
+            "shell",
+            normalized,
+            timeout_sec=ADB_SHELL_TIMEOUT_SEC,
+        )
+        if return_code != 0:
+            raise RuntimeError(stderr or stdout or "Shell command failed")
+
+        return stdout.strip()
+
+    async def get_device_props(self, device_id: str) -> dict[str, str]:
+        if not self.adb_available:
+            return {}
+
+        prop_keys = {
+            "product_brand": "ro.product.brand",
+            "product_manufacturer": "ro.product.manufacturer",
+            "product_model": "ro.product.model",
+            "android_version": "ro.build.version.release",
+            "serial": "ro.serialno",
+            "sdk_version": "ro.build.version.sdk",
+        }
+        tasks = [self._fetch_getprop_value(device_id, key) for key in prop_keys.values()]
+        values = await asyncio.gather(*tasks)
+        return {
+            field: value
+            for field, value in zip(prop_keys.keys(), values, strict=True)
+        }
+
     async def _enrich_device(self, device: DeviceInfo) -> DeviceInfo:
         if not device.online or not self.adb_available:
             return device

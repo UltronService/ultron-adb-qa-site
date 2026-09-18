@@ -1,9 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   captureScreenshot,
   exportLogcat,
+  fetchDeviceProps,
+  forceStopApp,
   getMockLogcatLines,
+  launchApp,
   openLogcatStream,
+  rebootDevice,
+  runShellCommand,
   sendKeyEvent,
   sendTextInput,
 } from '../api/console-api';
@@ -13,6 +18,7 @@ import { ULTRON_PLAYER_APK_SOURCE } from '../data/ultron-player-apk';
 import { fetchDevices } from '../api/device-api';
 import { useDemoMode } from '../hooks/use-demo-mode';
 import { useToast } from '../hooks/use-toast';
+import type { DeviceProps } from '../types/console-adb-types';
 import type { DeviceInfo } from '../types/api-types';
 
 import { LOG_LEVEL_OPTIONS, type LogLevel } from '../lib/ui-labels';
@@ -26,6 +32,18 @@ const KEY_MAP: Record<string, string> = {
   back: '4',
   home: '3',
   menu: '82',
+  volUp: '24',
+  volDown: '25',
+  power: '26',
+};
+
+const EMPTY_DEVICE_PROPS: DeviceProps = {
+  product_brand: '',
+  product_manufacturer: '',
+  product_model: '',
+  android_version: '',
+  serial: '',
+  sdk_version: '',
 };
 
 export function ConsolePage() {
@@ -42,6 +60,10 @@ export function ConsolePage() {
   const [previewUrl, setPreviewUrl] = useState(MOCK_SCREENSHOT_DATA_URL);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [error, setError] = useState('');
+  const [shellCommand, setShellCommand] = useState('');
+  const [shellOutput, setShellOutput] = useState('');
+  const [deviceProps, setDeviceProps] = useState<DeviceProps>(EMPTY_DEVICE_PROPS);
+  const [propsLoading, setPropsLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -60,6 +82,29 @@ export function ConsolePage() {
       setSelectedDevice(devices[0].id);
     }
   }, [devices, selectedDevice]);
+
+  const loadDeviceProps = useCallback(async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    setPropsLoading(true);
+    try {
+      const result = await fetchDeviceProps(selectedDevice);
+      setDeviceProps(result.props);
+    } catch (requestError) {
+      setDeviceProps(EMPTY_DEVICE_PROPS);
+      showToast(
+        requestError instanceof Error ? requestError.message : '無法讀取裝置屬性',
+        'error',
+      );
+    } finally {
+      setPropsLoading(false);
+    }
+  }, [selectedDevice, showToast]);
+
+  useEffect(() => {
+    void loadDeviceProps();
+  }, [loadDeviceProps]);
 
   useEffect(() => {
     if (!selectedDevice) {
@@ -159,6 +204,73 @@ export function ConsolePage() {
     }
   };
 
+  const runAdbAction = async (
+    label: string,
+    action: () => Promise<unknown>,
+  ) => {
+    if (!selectedDevice) {
+      return;
+    }
+    try {
+      await action();
+      showToast(`${label} 已執行${isDemoMode ? '（展示模式）' : ''}`, 'success');
+    } catch (requestError) {
+      showToast(
+        requestError instanceof Error ? requestError.message : `${label} 失敗`,
+        'error',
+      );
+    }
+  };
+
+  const handleLaunchApp = async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    await runAdbAction('開啟 App', () =>
+      launchApp(
+        selectedDevice,
+        ULTRON_PLAYER_APK_SOURCE.packageName,
+        ULTRON_PLAYER_APK_SOURCE.launchActivity,
+      ),
+    );
+  };
+
+  const handleForceStop = async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    await runAdbAction('強制停止', () =>
+      forceStopApp(selectedDevice, ULTRON_PLAYER_APK_SOURCE.packageName),
+    );
+  };
+
+  const handleReboot = async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    if (!window.confirm('確定要重新開機這台 STB 嗎？')) {
+      return;
+    }
+    await runAdbAction('重新開機', () => rebootDevice(selectedDevice));
+  };
+
+  const handleShell = async () => {
+    if (!selectedDevice || !shellCommand.trim()) {
+      return;
+    }
+    try {
+      const result = await runShellCommand(selectedDevice, shellCommand.trim());
+      setShellOutput(result.output || '（無輸出）');
+      showToast('Shell 指令已執行', 'success');
+    } catch (requestError) {
+      setShellOutput('');
+      showToast(
+        requestError instanceof Error ? requestError.message : 'Shell 指令失敗',
+        'error',
+      );
+    }
+  };
+
   const handleCapture = async () => {
     if (!selectedDevice) {
       return;
@@ -219,7 +331,7 @@ export function ConsolePage() {
           </div>
           <div className="field-group">
             <label htmlFor="adb-text">輸入文字</label>
-            <div className="inline-field">
+            <div className="inline-field inline-field--stack">
               <input
                 id="adb-text"
                 className="input"
@@ -230,6 +342,69 @@ export function ConsolePage() {
               <button type="button" className="btn btn--primary" onClick={() => void handleSendText()}>
                 送出
               </button>
+            </div>
+          </div>
+
+          <div className="console-adb-tools">
+            <h3>ADB 工具</h3>
+            <div className="console-adb-tools__grid">
+              <button type="button" className="btn btn--secondary" onClick={() => void handleLaunchApp()}>
+                開啟 App
+              </button>
+              <button type="button" className="btn btn--secondary" onClick={() => void handleForceStop()}>
+                強制停止
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => void handleKey('volUp')}>
+                音量+
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => void handleKey('volDown')}>
+                音量-
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => void handleKey('power')}>
+                電源
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => void handleReboot()}>
+                重新開機
+              </button>
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="adb-shell">Shell 指令</label>
+              <div className="inline-field inline-field--stack">
+                <input
+                  id="adb-shell"
+                  className="input"
+                  value={shellCommand}
+                  onChange={(event) => setShellCommand(event.target.value)}
+                  placeholder="getprop ro.product.brand"
+                />
+                <button type="button" className="btn btn--secondary" onClick={() => void handleShell()}>
+                  執行
+                </button>
+              </div>
+              {shellOutput ? <pre className="shell-output">{shellOutput}</pre> : null}
+            </div>
+
+            <div className="console-adb-props">
+              <div className="panel-header-row">
+                <h3>裝置屬性</h3>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  disabled={propsLoading}
+                  onClick={() => void loadDeviceProps()}
+                >
+                  {propsLoading ? '讀取中…' : '刷新'}
+                </button>
+              </div>
+              <dl className="meta-list meta-list--compact">
+                <div><dt>品牌</dt><dd>{deviceProps.product_brand || '-'}</dd></div>
+                <div><dt>製造商</dt><dd>{deviceProps.product_manufacturer || '-'}</dd></div>
+                <div><dt>型號</dt><dd>{deviceProps.product_model || '-'}</dd></div>
+                <div><dt>Android</dt><dd>{deviceProps.android_version || '-'}</dd></div>
+                <div><dt>SDK</dt><dd>{deviceProps.sdk_version || '-'}</dd></div>
+                <div><dt>序號</dt><dd>{deviceProps.serial || '-'}</dd></div>
+              </dl>
             </div>
           </div>
         </aside>

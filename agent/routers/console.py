@@ -26,6 +26,19 @@ class LogcatExportRequest(BaseModel):
     max_lines: int = Field(default=2000, ge=100, le=10000)
 
 
+class ShellCommandRequest(BaseModel):
+    command: str = Field(..., min_length=1, max_length=500)
+
+
+class ForceStopRequest(BaseModel):
+    package_name: str = Field(..., min_length=1)
+
+
+class LaunchAppRequest(BaseModel):
+    package_name: str = Field(default="com.ultron.player")
+    activity: str = Field(default="com.ultron.player/.MainActivity")
+
+
 @router.post("/{device_id}/screenshot")
 async def capture_screenshot(device_id: str) -> dict[str, str]:
     try:
@@ -83,6 +96,60 @@ async def export_logcat(device_id: str, payload: LogcatExportRequest) -> dict[st
         "content": content,
         "mock": "false" if adb_service.adb_available else "true",
     }
+
+
+@router.post("/{device_id}/shell")
+async def run_shell(device_id: str, payload: ShellCommandRequest) -> dict[str, str]:
+    try:
+        output = await adb_service.run_shell(device_id, payload.command)
+        return {"output": output, "mock": "false" if adb_service.adb_available else "true"}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/{device_id}/reboot")
+async def reboot_device(device_id: str) -> dict[str, str]:
+    try:
+        await adb_service.reboot_device(device_id)
+        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/{device_id}/force-stop")
+async def force_stop_app(device_id: str, payload: ForceStopRequest) -> dict[str, str]:
+    try:
+        await adb_service.force_stop_app(device_id, payload.package_name)
+        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/{device_id}/launch-app")
+async def launch_app(device_id: str, payload: LaunchAppRequest) -> dict[str, str]:
+    try:
+        await adb_service.launch_app(
+            device_id,
+            payload.package_name,
+            payload.activity,
+        )
+        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.get("/{device_id}/props")
+async def get_device_props(device_id: str) -> dict[str, str | dict[str, str]]:
+    try:
+        props = await adb_service.get_device_props(device_id)
+        return {
+            "props": props,
+            "mock": "false" if adb_service.adb_available else "true",
+        }
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
 
 
 @router.websocket("/{device_id}/logcat")
