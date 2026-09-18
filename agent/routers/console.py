@@ -1,8 +1,10 @@
 import base64
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from services.adb_service import AdbService
@@ -37,6 +39,18 @@ class ForceStopRequest(BaseModel):
 class LaunchAppRequest(BaseModel):
     package_name: str = Field(default="com.ultron.player")
     activity: str = Field(default="com.ultron.player/.MainActivity")
+
+
+class PackageNameRequest(BaseModel):
+    package_name: str = Field(default="com.ultron.player")
+
+
+class ScreenRecordRequest(BaseModel):
+    duration_seconds: int = Field(default=30, ge=1, le=180)
+
+
+class SetDateTimeRequest(BaseModel):
+    datetime: str = Field(..., min_length=1)
 
 
 @router.post("/{device_id}/screenshot")
@@ -136,6 +150,115 @@ async def launch_app(device_id: str, payload: LaunchAppRequest) -> dict[str, str
             payload.activity,
         )
         return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/{device_id}/clear-app")
+async def clear_app_data(device_id: str, payload: PackageNameRequest) -> dict[str, str]:
+    try:
+        await adb_service.clear_app_data(device_id, payload.package_name)
+        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/{device_id}/uninstall")
+async def uninstall_app(device_id: str, payload: PackageNameRequest) -> dict[str, str]:
+    try:
+        await adb_service.uninstall_app(device_id, payload.package_name)
+        return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/{device_id}/install")
+async def install_app_on_device(
+    device_id: str,
+    replace: bool = Form(default=True),
+    allow_downgrade: bool = Form(default=False),
+    apk_file: UploadFile = File(...),
+) -> dict[str, str]:
+    if not apk_file.filename or not apk_file.filename.lower().endswith(".apk"):
+        raise HTTPException(status_code=400, detail="An .apk file is required.")
+
+    suffix = Path(apk_file.filename).suffix or ".apk"
+    temp_path: Path | None = None
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+            temp_path = Path(temp_file.name)
+            content = await apk_file.read()
+            temp_path.write_bytes(content)
+
+        await adb_service.install_apk(
+            device_id,
+            str(temp_path),
+            replace=replace,
+            allow_downgrade=allow_downgrade,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+    return {"status": "ok", "mock": "false" if adb_service.adb_available else "true"}
+
+
+@router.post("/{device_id}/screenrecord")
+async def capture_screen_record(device_id: str, payload: ScreenRecordRequest) -> Response:
+    try:
+        video_bytes = await adb_service.capture_screen_record(
+            device_id,
+            payload.duration_seconds,
+        )
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+    if not video_bytes:
+        raise HTTPException(status_code=503, detail="Screen recording unavailable (adb not found)")
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    safe_device = device_id.replace(":", "-")
+    filename = f"screenrecord-{safe_device}-{timestamp}.mp4"
+    return Response(
+        content=video_bytes,
+        media_type="video/mp4",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/{device_id}/datetime/set")
+async def set_device_datetime(device_id: str, payload: SetDateTimeRequest) -> dict[str, str]:
+    try:
+        message = await adb_service.set_device_datetime(device_id, payload.datetime)
+        return {
+            "status": "ok",
+            "message": message,
+            "mock": "false" if adb_service.adb_available else "true",
+        }
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except RuntimeError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/{device_id}/datetime/restore-network")
+async def restore_network_time(device_id: str) -> dict[str, str]:
+    try:
+        message = await adb_service.restore_network_time(device_id)
+        return {
+            "status": "ok",
+            "message": message,
+            "mock": "false" if adb_service.adb_available else "true",
+        }
     except RuntimeError as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
 

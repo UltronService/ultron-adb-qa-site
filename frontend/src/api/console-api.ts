@@ -5,7 +5,7 @@ import type {
   DevicePropsResponse,
   ShellCommandResponse,
 } from '../types/console-adb-types';
-import { agentRequest, getAgentWebSocketBase } from './agent-client';
+import { agentRequest, getAgentBaseUrl, getAgentWebSocketBase } from './agent-client';
 
 interface ScreenshotResponse {
   image_base64: string;
@@ -133,4 +133,75 @@ export async function launchApp(
 
 export async function fetchDeviceProps(deviceId: string): Promise<DevicePropsResponse> {
   return agentRequest<DevicePropsResponse>(`/api/console/${deviceId}/props`);
+}
+
+export async function clearAppData(
+  deviceId: string,
+  packageName: string,
+): Promise<AdbActionResponse> {
+  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/clear-app`, {
+    method: 'POST',
+    body: JSON.stringify({ package_name: packageName }),
+  });
+}
+
+export async function uninstallApp(
+  deviceId: string,
+  packageName: string,
+): Promise<AdbActionResponse> {
+  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/uninstall`, {
+    method: 'POST',
+    body: JSON.stringify({ package_name: packageName }),
+  });
+}
+
+export async function installApkOnDevice(
+  deviceId: string,
+  file: File,
+  options: { replace: boolean; allowDowngrade: boolean },
+): Promise<AdbActionResponse> {
+  const formData = new FormData();
+  formData.append('apk_file', file);
+  formData.append('replace', String(options.replace));
+  formData.append('allow_downgrade', String(options.allowDowngrade));
+  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/install`, {
+    method: 'POST',
+    body: formData,
+    parseJson: true,
+  });
+}
+
+export async function captureScreenRecord(
+  deviceId: string,
+  durationSeconds: number,
+): Promise<Blob> {
+  const response = await fetch(
+    `${getAgentBaseUrl()}/api/console/${deviceId}/screenrecord`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration_seconds: durationSeconds }),
+    },
+  );
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || 'Screen recording failed');
+  }
+  return response.blob();
+}
+
+export async function setDeviceDatetime(
+  deviceId: string,
+  datetime: string,
+): Promise<AdbActionResponse> {
+  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/datetime/set`, {
+    method: 'POST',
+    body: JSON.stringify({ datetime }),
+  });
+}
+
+export async function restoreNetworkTime(deviceId: string): Promise<AdbActionResponse> {
+  return agentRequest<AdbActionResponse>(`/api/console/${deviceId}/datetime/restore-network`, {
+    method: 'POST',
+  });
 }

@@ -20,4 +20,10 @@ export interface ShellCommandResponse {
 export interface AdbActionResponse {
   status: string;
   mock: string;
+  message?: string;
+}
+
+export interface InstallApkOptions {
+  replace: boolean;
+  allowDowngrade: boolean;
 }

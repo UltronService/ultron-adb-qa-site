@@ -1,16 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  captureScreenRecord,
   captureScreenshot,
+  clearAppData,
   exportLogcat,
   fetchDeviceProps,
   forceStopApp,
   getMockLogcatLines,
+  installApkOnDevice,
   launchApp,
   openLogcatStream,
   rebootDevice,
+  restoreNetworkTime,
   runShellCommand,
   sendKeyEvent,
   sendTextInput,
+  setDeviceDatetime as setDeviceDatetimeOnDevice,
+  uninstallApp,
 } from '../api/console-api';
 import { Modal } from '../components/ui/modal';
 import { MOCK_SCREENSHOT_DATA_URL } from '../data/mock-screenshot';
@@ -64,6 +70,11 @@ export function ConsolePage() {
   const [shellOutput, setShellOutput] = useState('');
   const [deviceProps, setDeviceProps] = useState<DeviceProps>(EMPTY_DEVICE_PROPS);
   const [propsLoading, setPropsLoading] = useState(false);
+  const [apkFile, setApkFile] = useState<File | null>(null);
+  const [installReplace, setInstallReplace] = useState(true);
+  const [installAllowDowngrade, setInstallAllowDowngrade] = useState(false);
+  const [deviceDatetime, setDeviceDatetime] = useState('');
+  const [recording, setRecording] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -271,6 +282,84 @@ export function ConsolePage() {
     }
   };
 
+  const handleInstallApk = async () => {
+    if (!selectedDevice || !apkFile) {
+      showToast('請先選擇 APK 檔案', 'error');
+      return;
+    }
+    await runAdbAction('APK 安裝', () =>
+      installApkOnDevice(selectedDevice, apkFile, {
+        replace: installReplace,
+        allowDowngrade: installAllowDowngrade,
+      }),
+    );
+  };
+
+  const handleUninstallApp = async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    if (!window.confirm(`確定要卸載 ${ULTRON_PLAYER_APK_SOURCE.packageName} 嗎？`)) {
+      return;
+    }
+    await runAdbAction('App 卸載', () =>
+      uninstallApp(selectedDevice, ULTRON_PLAYER_APK_SOURCE.packageName),
+    );
+  };
+
+  const handleClearAppData = async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    if (!window.confirm('確定要清除 App 資料與快取嗎？')) {
+      return;
+    }
+    await runAdbAction('清除資料', () =>
+      clearAppData(selectedDevice, ULTRON_PLAYER_APK_SOURCE.packageName),
+    );
+  };
+
+  const handleScreenRecord = async () => {
+    if (!selectedDevice || recording) {
+      return;
+    }
+    setRecording(true);
+    try {
+      const blob = await captureScreenRecord(selectedDevice, 30);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `screenrecord-${selectedDevice.replace(':', '-')}.mp4`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast('錄影已下載（30 秒）', 'success');
+    } catch (requestError) {
+      showToast(
+        requestError instanceof Error ? requestError.message : '錄影失敗',
+        'error',
+      );
+    } finally {
+      setRecording(false);
+    }
+  };
+
+  const handleSetDatetime = async () => {
+    if (!selectedDevice || !deviceDatetime) {
+      showToast('請選擇日期時間', 'error');
+      return;
+    }
+    await runAdbAction('設定時間', () =>
+      setDeviceDatetimeOnDevice(selectedDevice, deviceDatetime),
+    );
+  };
+
+  const handleRestoreNetworkTime = async () => {
+    if (!selectedDevice) {
+      return;
+    }
+    await runAdbAction('恢復網路時間', () => restoreNetworkTime(selectedDevice));
+  };
+
   const handleCapture = async () => {
     if (!selectedDevice) {
       return;
@@ -368,6 +457,79 @@ export function ConsolePage() {
               </button>
             </div>
 
+            <div className="console-adb-section">
+              <h3>App 安裝 / 卸載 / 啟動</h3>
+              <div className="field-group">
+                <label htmlFor="console-apk-file">APK 檔案</label>
+                <input
+                  id="console-apk-file"
+                  className="input"
+                  type="file"
+                  accept=".apk,application/vnd.android.package-archive"
+                  onChange={(event) => setApkFile(event.target.files?.[0] ?? null)}
+                />
+              </div>
+              <div className="console-adb-checks">
+                <label className="console-adb-check">
+                  <input
+                    type="checkbox"
+                    checked={installReplace}
+                    onChange={(event) => setInstallReplace(event.target.checked)}
+                  />
+                  覆蓋安裝 (-r)
+                </label>
+                <label className="console-adb-check">
+                  <input
+                    type="checkbox"
+                    checked={installAllowDowngrade}
+                    onChange={(event) => setInstallAllowDowngrade(event.target.checked)}
+                  />
+                  允許降版 (-d)
+                </label>
+              </div>
+              <div className="console-adb-tools__grid">
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={!apkFile}
+                  onClick={() => void handleInstallApk()}
+                >
+                  安裝 APK
+                </button>
+                <button type="button" className="btn btn--secondary" onClick={() => void handleLaunchApp()}>
+                  啟動 App
+                </button>
+                <button type="button" className="btn btn--ghost" onClick={() => void handleUninstallApp()}>
+                  卸載 App
+                </button>
+                <button type="button" className="btn btn--ghost" onClick={() => void handleClearAppData()}>
+                  清除資料與快取
+                </button>
+              </div>
+            </div>
+
+            <div className="console-adb-section">
+              <h3>STB 日期與時間</h3>
+              <div className="field-group">
+                <label htmlFor="console-datetime">設定裝置時間</label>
+                <input
+                  id="console-datetime"
+                  className="input"
+                  type="datetime-local"
+                  value={deviceDatetime}
+                  onChange={(event) => setDeviceDatetime(event.target.value)}
+                />
+              </div>
+              <div className="console-adb-tools__grid">
+                <button type="button" className="btn btn--secondary" onClick={() => void handleSetDatetime()}>
+                  設定時間
+                </button>
+                <button type="button" className="btn btn--ghost" onClick={() => void handleRestoreNetworkTime()}>
+                  恢復網路時間
+                </button>
+              </div>
+            </div>
+
             <div className="field-group">
               <label htmlFor="adb-shell">Shell 指令</label>
               <div className="inline-field inline-field--stack">
@@ -418,6 +580,14 @@ export function ConsolePage() {
             <div className="toolbar">
               <button type="button" className="btn btn--secondary" onClick={() => void handleCapture()}>
                 立即截圖
+              </button>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                disabled={recording}
+                onClick={() => void handleScreenRecord()}
+              >
+                {recording ? '錄影中…' : '錄影 30 秒'}
               </button>
               <button type="button" className="btn btn--ghost" onClick={() => setPreviewOpen(true)}>
                 全螢幕
